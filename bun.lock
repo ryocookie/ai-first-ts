@@ -119,6 +119,9 @@
     "packages/config": {
       "name": "@ai-first-ts/config",
       "version": "0.0.0",
+      "devDependencies": {
+        "typescript": "catalog:",
+      },
     },
     "packages/db": {
       "name": "@ai-first-ts/db",
