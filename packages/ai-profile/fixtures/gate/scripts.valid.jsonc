@@ -4,7 +4,7 @@
 {
   "name": "ai-first-ts",
   "scripts": {
-    "verify": "turbo run check-types && bun packages/ai-profile/lint/check-fixtures.mjs && bun packages/ai-profile/lint/run.mjs && oxfmt --check && bun packages/ai-profile/gate/check.mjs && bun run test",
+    "verify": "turbo run check-types && bun packages/ai-profile/lint/check-fixtures.mjs && bun packages/ai-profile/lint/run.mjs && oxfmt --check && bun packages/ai-profile/test/run.mjs && bun packages/ai-profile/gate/check.mjs && bun run test",
     "verify:quick": "bun packages/ai-profile/lint/run.mjs --quiet && bun packages/ai-profile/gate/check.mjs --quiet",
   },
 }

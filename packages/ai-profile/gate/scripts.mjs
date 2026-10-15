@@ -7,6 +7,7 @@ export const REQUIRED_VERIFY = [
   "bun packages/ai-profile/lint/check-fixtures.mjs",
   "bun packages/ai-profile/lint/run.mjs",
   "oxfmt --check",
+  "bun packages/ai-profile/test/run.mjs",
   "bun packages/ai-profile/gate/check.mjs",
 ];
 export const REQUIRED_VERIFY_QUICK = [
@@ -50,15 +51,16 @@ export function findWeakenedScripts(path, pkg) {
     typeof record.scripts === "object" && record.scripts !== null ? record.scripts : {};
   const script = (name) => (typeof scripts[name] === "string" ? scripts[name] : "");
 
+  /** @type {{ name: string, steps: string[] }[]} */
   const required =
     path === "package.json"
       ? [
-          ["verify", REQUIRED_VERIFY],
-          ["verify:quick", REQUIRED_VERIFY_QUICK],
+          { name: "verify", steps: REQUIRED_VERIFY },
+          { name: "verify:quick", steps: REQUIRED_VERIFY_QUICK },
         ]
-      : [["check-types", [CHECK_TYPES_EXCEPTIONS[record.name] ?? "tsc-hints"]]];
+      : [{ name: "check-types", steps: [CHECK_TYPES_EXCEPTIONS[record.name] ?? "tsc-hints"] }];
 
-  for (const [name, steps] of required) {
+  for (const { name, steps } of required) {
     const text = script(name);
     for (const step of steps) {
       if (!runsStep(text, step)) {
