@@ -243,6 +243,16 @@ const userScopeCases = [
     found: 0,
   },
   {
+    path: "packages/ai-profile/db/testing.ts",
+    text: `import { drizzle } from "drizzle-orm/sqlite-proxy";\nimport { userScoped } from "./user-scope";`,
+    found: 0,
+  },
+  {
+    path: "packages/ai-profile/db/testing.test.ts",
+    text: `import { drizzle } from "drizzle-orm/sqlite-proxy";`,
+    found: 1,
+  },
+  {
     path: "packages/ai-profile/db/other.ts",
     text: `export { userScoped } from "./index";`,
     found: 1,

@@ -15,5 +15,5 @@
       "react": ["../../../../apps/web/node_modules/@types/react"]
     }
   },
-  "include": ["*.ts"]
+  "include": ["*.ts", "../../test/bun-test.d.ts"]
 }
