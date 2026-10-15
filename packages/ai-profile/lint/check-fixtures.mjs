@@ -1,13 +1,15 @@
 // .oxlintrc.json が禁止ルールを強制し続けていることを検査する:
 // HINTS の各ルールに fixtures/lint/<rule>.invalid.ts と <rule>.valid.ts があり、
 // invalid は先頭の `// expect: <code>` のルールだけで失敗し、valid は診断ゼロであること。
-// あわせて、throw の境界（throw-boundaries.mjs）が許可する範囲を表形式のケースで検査する。
+// あわせて、throw の境界（throw-boundaries.mjs）と外部入力の境界（untrusted-boundaries.mjs）が
+// 許可する範囲を表形式のケースで検査する。
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { HINTS } from "./hints.mjs";
 import { findThrows } from "./no-throw.mjs";
 import { lint, repoRoot } from "./oxlint.mjs";
+import { findUntrustedInput } from "./untrusted-input.mjs";
 
 const fixtureDir = join(import.meta.dirname, "..", "fixtures", "lint");
 const ruleName = (code) => /\((.+)\)$/.exec(code)?.[1] ?? code;
@@ -124,10 +126,72 @@ for (const { path, text, throws } of throwCases) {
   }
 }
 
+// 外部入力の境界もファイルパスで決まるため、パスと内容の組で検査する。
+const untrustedCases = [
+  {
+    path: "apps/web/src/env.public.ts",
+    text: `export const url = import.meta.env["VITE_SERVER_URL"];`,
+    found: 0,
+  },
+  {
+    path: "apps/web/src/a.ts",
+    text: `export const url = import.meta.env["VITE_SERVER_URL"];`,
+    found: 1,
+  },
+  {
+    path: "apps/server/src/env.server.ts",
+    text: `export { env as ENV } from "cloudflare:workers";`,
+    found: 0,
+  },
+  {
+    path: "apps/server/src/a.ts",
+    text: `export { env as ENV } from "cloudflare:workers";`,
+    found: 1,
+  },
+  { path: "apps/server/src/a.ts", text: `import { env } from "hono/adapter";`, found: 1 },
+  { path: "apps/server/src/a.ts", text: `app.get("/", (c) => c.text(c.env.SECRET));`, found: 1 },
+  { path: "apps/server/src/env.server.ts", text: `export const x = JSON.parse("{}");`, found: 1 },
+  { path: "packages/ai-profile/core/validate.ts", text: `const x = JSON.parse(t);`, found: 0 },
+  { path: "packages/ai-profile/core/validate.ts", text: `const x = process.env.A;`, found: 1 },
+  { path: "packages/x/src/a.ts", text: `const body = await c.req.json<Order>();`, found: 1 },
+  { path: "packages/x/src/a.ts", text: `app.get("/", (c) => c.json({ ok: true }));`, found: 0 },
+  { path: "packages/x/src/a.ts", text: `const z = { any: () => 1 };\nz.any();`, found: 0 },
+  {
+    path: "packages/x/src/a.ts",
+    text: `import { z as zod } from "zod";\nexport const S = zod.any();`,
+    found: 1,
+  },
+  {
+    path: "packages/x/src/a.ts",
+    text: `// JSON.parse(text) and process.env\nconst s = "res.json()";`,
+    found: 0,
+  },
+  {
+    path: "apps/web/src/a.tsx",
+    text: `const C = () => <p dangerouslySetInnerHTML={h} />;`,
+    found: 1,
+  },
+  {
+    path: "packages/x/src/a.ts",
+    text: `import { sql as q } from "drizzle-orm";\nq.raw(s);`,
+    found: 1,
+  },
+];
+for (const { path, text, found } of untrustedCases) {
+  const actual = findUntrustedInput(path, text).length;
+  if (actual !== found) {
+    failures.push(
+      `untrusted-input boundary case ${path}: expected ${found} violation(s), got ${actual}.\n${text}\n` +
+        `  直し方: lint/untrusted-input.mjs と lint/untrusted-boundaries.mjs の判定を見直す。境界の追加・緩和は人間の承認が必要。`,
+    );
+  }
+}
+
 if (failures.length > 0) {
   console.error(`lint rule fixtures failed:\n\n${failures.join("\n\n")}`);
   process.exit(1);
 }
 console.log(
-  `lint rule fixtures passed (${files.length} files, ${throwCases.length} no-throw boundary cases).`,
+  `lint rule fixtures passed (${files.length} files, ${throwCases.length} no-throw and ` +
+    `${untrustedCases.length} untrusted-input boundary cases).`,
 );

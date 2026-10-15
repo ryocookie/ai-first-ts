@@ -43,4 +43,16 @@ export const HINTS = {
     "throw しうるライブラリ呼び出しは `tryCatch` / `tryCatchAsync` で Result に変換する。" +
     "境界（packages/api の ORPCError、apps/web/src/routes の redirect / notFound）では Result を受けてそこで throw する。" +
     "それ以外の場所で throw が必要なら回避せず、lint/throw-boundaries.mjs への追加を提案として報告する。",
+  "ai-profile(untrusted-input)":
+    "外部入力は unknown として受け取り、Zod スキーマで検証してから使う。" +
+    '`import { parseJson, readJson, validate } from "@ai-first-ts/ai-profile/core"` を使い、' +
+    "`JSON.parse(text)` は `parseJson(Schema, text)`、`await res.json()` は `await readJson(Schema, res)`、" +
+    "その他の unknown は `validate(Schema, value)` に置き換えて Result を扱う。" +
+    "oRPC の入力は `.input(z.object(...))` で検証し、`type<T>()` は使わない。`z.any()` は `z.unknown()`、" +
+    "`z.custom<T>()` には検査関数を渡す。環境変数は env モジュール（apps/web/src/env.public.ts・apps/server/src/env.server.ts）の " +
+    "`ENV` から読む。新しい入口ファイルが必要なら回避せず、lint/untrusted-boundaries.mjs への追加を提案として報告する。",
+  "ai-profile(unsafe-sink)":
+    "`sql.raw(...)` は drizzle の sql タグ付きテンプレート（埋め込んだ値はパラメータとしてバインドされる）かクエリビルダに置き換える。" +
+    "`dangerouslySetInnerHTML` は消し、テキストは JSX の子要素として渡して React にエスケープさせる。" +
+    "どうしても HTML を挿入する必要がある場合は回避せず、実装を止めて報告する。",
 };
