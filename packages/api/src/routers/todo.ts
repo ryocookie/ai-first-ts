@@ -3,6 +3,7 @@ import { ORPCError } from "@orpc/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { summarizeTodos } from "../domain/todo";
 import { protectedProcedure } from "../index";
 
 // データは context.data（ログイン中のユーザーに限定したアクセサ）からだけ読み書きする。
@@ -14,6 +15,15 @@ export const todoRouter = {
       throw new ORPCError("INTERNAL_SERVER_ERROR");
     }
     return todos.value;
+  }),
+
+  // 集計はドメイン層の純粋関数に任せ、ここでは I/O（読み込み）とエラーへの変換だけを行う。
+  summary: protectedProcedure.handler(async ({ context }) => {
+    const todos = await context.data.select(todo);
+    if (!todos.ok) {
+      throw new ORPCError("INTERNAL_SERVER_ERROR");
+    }
+    return summarizeTodos(todos.value);
   }),
 
   add: protectedProcedure

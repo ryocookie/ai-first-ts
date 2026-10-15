@@ -1,7 +1,8 @@
-// oxlint を JSON 出力で実行し、プロファイル独自の検査（lint 無効化ディレクティブ・throw・外部入力と sink・ユーザースコープ・テスト）を加えた診断を返す。
+// oxlint を JSON 出力で実行し、プロファイル独自の検査（lint 無効化ディレクティブ・throw・外部入力と sink・ユーザースコープ・ドメイン層の純粋性・テスト）を加えた診断を返す。
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { findImpureDomainCode } from "./domain-purity.mjs";
 import { findThrows } from "./no-throw.mjs";
 import { findTestViolations } from "./test-rules.mjs";
 import { findUntrustedInput } from "./untrusted-input.mjs";
@@ -33,6 +34,7 @@ function findProfileViolations(args) {
       ...findThrows(file, text),
       ...findUntrustedInput(file, text),
       ...findUnscopedDataAccess(file, text),
+      ...findImpureDomainCode(file, text),
       ...findTestViolations(file, text),
     );
     text.split("\n").forEach((line, index) => {

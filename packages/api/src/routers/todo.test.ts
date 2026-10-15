@@ -74,3 +74,27 @@ describe("setCompleted / remove", () => {
     });
   });
 });
+
+describe("summary", () => {
+  test("本人の todo だけを集計する", async () => {
+    const alice = clientOf("alice");
+    const { id } = await alice.add({ title: "a" });
+    await alice.add({ title: "b" });
+    await alice.setCompleted({ id, completed: true });
+    await clientOf("bob").add({ title: "bob's" });
+
+    expect(await alice.summary()).toStrictEqual({
+      total: 2,
+      completed: 1,
+      remaining: 1,
+      percentCompleted: 50,
+    });
+  });
+
+  test("DB の失敗は INTERNAL_SERVER_ERROR", async () => {
+    db.rows("drop table todo");
+    await expect(clientOf("alice").summary()).rejects.toMatchObject({
+      code: "INTERNAL_SERVER_ERROR",
+    });
+  });
+});
