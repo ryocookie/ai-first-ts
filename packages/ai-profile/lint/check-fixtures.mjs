@@ -1,8 +1,8 @@
 // .oxlintrc.json が禁止ルールを強制し続けていることを検査する:
 // HINTS の各ルールに fixtures/lint/<rule>.invalid.ts と <rule>.valid.ts があり、
 // invalid は先頭の `// expect: <code>` のルールだけで失敗し、valid は診断ゼロであること。
-// あわせて、throw の境界（throw-boundaries.mjs）と外部入力の境界（untrusted-boundaries.mjs）が
-// 許可する範囲を表形式のケースで検査する。
+// あわせて、throw の境界（throw-boundaries.mjs）・外部入力の境界（untrusted-boundaries.mjs）・
+// データアクセスの境界（data-access-boundaries.mjs）が許可する範囲を表形式のケースで検査する。
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
@@ -10,6 +10,7 @@ import { HINTS } from "./hints.mjs";
 import { findThrows } from "./no-throw.mjs";
 import { lint, repoRoot } from "./oxlint.mjs";
 import { findUntrustedInput } from "./untrusted-input.mjs";
+import { findUnscopedDataAccess } from "./user-scope.mjs";
 
 const fixtureDir = join(import.meta.dirname, "..", "fixtures", "lint");
 const ruleName = (code) => /\((.+)\)$/.exec(code)?.[1] ?? code;
@@ -186,11 +187,90 @@ for (const { path, text, found } of untrustedCases) {
   }
 }
 
+// データアクセスの境界もファイルパスで決まるため、パスと内容の組で検査する。
+const createDbImport = `import { createDb, type Database } from "@ai-first-ts/db";`;
+const scopeImport = `import { userScoped } from "@ai-first-ts/ai-profile/db";`;
+const userScopeCases = [
+  { path: "apps/server/src/services.ts", text: createDbImport, found: 0 },
+  { path: "apps/server/src/services.ts", text: scopeImport, found: 1 },
+  { path: "apps/server/src/context.ts", text: scopeImport, found: 0 },
+  { path: "apps/server/src/context.ts", text: createDbImport, found: 2 },
+  { path: "packages/api/src/routers/a.ts", text: createDbImport, found: 2 },
+  { path: "packages/db/src/index.ts", text: `import { drizzle } from "drizzle-orm/d1";`, found: 0 },
+  { path: "packages/db/src/index.ts", text: `drizzle(env.DB);`, found: 0 },
+  { path: "packages/db/src/todo.ts", text: `import { createDb } from "./index";`, found: 1 },
+  { path: "packages/db/src/todo.ts", text: `import { createDb } from ".";`, found: 1 },
+  {
+    path: "packages/auth/src/index.ts",
+    text: `import type { Database } from "@ai-first-ts/db";`,
+    found: 0,
+  },
+  { path: "packages/x/src/a.ts", text: `export * from "@ai-first-ts/db";`, found: 1 },
+  {
+    path: "packages/x/src/a.ts",
+    text: `export { createDb as c } from "@ai-first-ts/db/index";`,
+    found: 1,
+  },
+  { path: "packages/x/src/a.ts", text: `import type { SQL } from "drizzle-orm";`, found: 0 },
+  { path: "packages/x/src/a.ts", text: `import { eq, sql } from "drizzle-orm";`, found: 0 },
+  {
+    path: "packages/x/src/a.ts",
+    text: `import { sqliteTable, text } from "drizzle-orm/sqlite-core";`,
+    found: 0,
+  },
+  {
+    path: "packages/x/src/a.ts",
+    text: `import type { DrizzleD1Database } from "drizzle-orm/d1";`,
+    found: 1,
+  },
+  {
+    path: "packages/x/src/a.ts",
+    text: `import { migrate } from "drizzle-orm/d1/migrator";`,
+    found: 1,
+  },
+  {
+    path: "packages/x/src/a.ts",
+    text: `import type { UserScopedDb } from "@ai-first-ts/ai-profile/db";`,
+    found: 0,
+  },
+  {
+    path: "packages/ai-profile/db/index.ts",
+    text: `export { userScoped } from "./user-scope";`,
+    found: 0,
+  },
+  {
+    path: "packages/ai-profile/db/other.ts",
+    text: `export { userScoped } from "./index";`,
+    found: 1,
+  },
+  {
+    path: "apps/server/src/a.ts",
+    text: `const rows = ENV.DB.prepare("select * from todo");`,
+    found: 1,
+  },
+  { path: "apps/server/src/a.ts", text: `const { DB: d1 } = ENV;`, found: 1 },
+  { path: "apps/server/src/a.ts", text: `const d1 = ENV["DB"];`, found: 1 },
+  {
+    path: "apps/server/src/a.ts",
+    text: `// ENV.DB and createDb\nconst s = "drizzle-orm/d1";`,
+    found: 0,
+  },
+];
+for (const { path, text, found } of userScopeCases) {
+  const actual = findUnscopedDataAccess(path, text).length;
+  if (actual !== found) {
+    failures.push(
+      `user-scope boundary case ${path}: expected ${found} violation(s), got ${actual}.\n${text}\n` +
+        `  直し方: lint/user-scope.mjs と lint/data-access-boundaries.mjs の判定を見直す。境界の追加・緩和は人間の承認が必要。`,
+    );
+  }
+}
+
 if (failures.length > 0) {
   console.error(`lint rule fixtures failed:\n\n${failures.join("\n\n")}`);
   process.exit(1);
 }
 console.log(
   `lint rule fixtures passed (${files.length} files, ${throwCases.length} no-throw and ` +
-    `${untrustedCases.length} untrusted-input boundary cases).`,
+    `${untrustedCases.length} untrusted-input and ${userScopeCases.length} user-scope boundary cases).`,
 );

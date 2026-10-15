@@ -1,3 +1,4 @@
+import { userScoped } from "@ai-first-ts/ai-profile/db";
 import type { Context as ApiContext } from "@ai-first-ts/api/context";
 import type { Context as HonoContext } from "hono";
 
@@ -15,9 +16,10 @@ export async function createContext({ context }: CreateContextOptions): Promise<
   ).api.getSession({
     headers: context.req.raw.headers,
   });
+  // データアクセスの所有者は認証済みセッションのユーザーだけ。ハンドラに生の db は渡さない。
   return {
-    db,
     session,
+    data: session === null ? null : userScoped(db, session.user.id),
   };
 }
 

@@ -1,9 +1,10 @@
-// oxlint を JSON 出力で実行し、プロファイル独自の検査（lint 無効化ディレクティブ・throw・外部入力と sink）を加えた診断を返す。
+// oxlint を JSON 出力で実行し、プロファイル独自の検査（lint 無効化ディレクティブ・throw・外部入力と sink・ユーザースコープ）を加えた診断を返す。
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { findThrows } from "./no-throw.mjs";
 import { findUntrustedInput } from "./untrusted-input.mjs";
+import { findUnscopedDataAccess } from "./user-scope.mjs";
 
 export const repoRoot = join(import.meta.dirname, "..", "..", "..");
 const oxlintBin = join(repoRoot, "node_modules", ".bin", "oxlint");
@@ -27,7 +28,11 @@ function findProfileViolations(args) {
   const diagnostics = [];
   for (const file of files) {
     const text = readFileSync(join(repoRoot, file), "utf8");
-    diagnostics.push(...findThrows(file, text), ...findUntrustedInput(file, text));
+    diagnostics.push(
+      ...findThrows(file, text),
+      ...findUntrustedInput(file, text),
+      ...findUnscopedDataAccess(file, text),
+    );
     text.split("\n").forEach((line, index) => {
       if (disableDirective.test(line)) {
         diagnostics.push({
