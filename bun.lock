@@ -89,6 +89,9 @@
       "bin": {
         "tsc-hints": "./bin/tsc-hints.mjs",
       },
+      "dependencies": {
+        "zod": "catalog:",
+      },
       "devDependencies": {
         "@ai-first-ts/config": "workspace:*",
         "typescript": "catalog:",
