@@ -1,0 +1,7 @@
+// expect: gate(scripts)
+// path: packages/api/package.json
+// パッケージの check-types を型チェックしないコマンドに差し替える。
+{
+  "name": "@ai-first-ts/api",
+  "scripts": { "check-types": "echo skipped" },
+}

@@ -1,0 +1,13 @@
+// expect: gate(lint-config)
+// path: .oxlintrc.json
+// ルールは "error" でだけ追加し、対象外はフィクスチャだけにする。
+{
+  "plugins": ["typescript"],
+  "categories": { "correctness": "error" },
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    "typescript/consistent-type-assertions": ["error", { "assertionStyle": "never" }],
+  },
+  "overrides": [{ "files": ["**/*.ts"], "rules": { "typescript/no-unsafe-call": "error" } }],
+  "ignorePatterns": ["packages/ai-profile/fixtures/**"],
+}

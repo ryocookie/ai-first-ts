@@ -1,0 +1,10 @@
+// expect: gate(deps)
+// path: package.json
+// ルートの catalog に allowlist 外のパッケージを足すのも依存の追加にあたる。
+{
+  "name": "ai-first-ts",
+  "workspaces": {
+    "packages": ["apps/*", "packages/*"],
+    "catalog": { "zod": "^4.5.4", "zod-mini-extra": "^1.0.0" },
+  },
+}

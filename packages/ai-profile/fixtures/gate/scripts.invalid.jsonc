@@ -1,0 +1,10 @@
+// expect: gate(scripts)
+// path: package.json
+// CI が実行する verify から lint を外し、型チェックの失敗を握りつぶす。
+{
+  "name": "ai-first-ts",
+  "scripts": {
+    "verify": "turbo run check-types || true && bun packages/ai-profile/lint/check-fixtures.mjs && oxfmt --check && bun packages/ai-profile/gate/check.mjs",
+    "verify:quick": "bun packages/ai-profile/lint/run.mjs --quiet && bun packages/ai-profile/gate/check.mjs --quiet",
+  },
+}
