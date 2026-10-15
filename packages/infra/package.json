@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check-types": "tsc --noEmit",
+    "check-types": "tsc-hints --noEmit",
     "dev": "alchemy dev",
     "deploy": "alchemy deploy",
     "destroy": "alchemy destroy"
@@ -12,6 +12,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@ai-first-ts/ai-profile": "workspace:*",
     "@ai-first-ts/config": "workspace:*",
     "@effect/platform-bun": "4.0.4",
     "@effect/platform-node": "4.0.4",
