@@ -1,0 +1,19 @@
+{
+  "extends": "../../../config/tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ESNext", "DOM"],
+    "types": ["node"],
+    // 型情報を使う lint（no-unsafe-*）がフィクスチャの import を解決できるよう、
+    // ワークスペースごとに分離インストールされた依存を指す。解決できないと型が error になり誤検知する。
+    "paths": {
+      "@orpc/server": ["../../../api/node_modules/@orpc/server/dist/index.d.mts"],
+      "@ai-first-ts/db": ["../../../db/src/index.ts"],
+      "@ai-first-ts/db/*": ["../../../db/src/*.ts"],
+      "drizzle-orm": ["../../node_modules/drizzle-orm"],
+      "drizzle-orm/*": ["../../node_modules/drizzle-orm/*"],
+      "react": ["../../../../apps/web/node_modules/@types/react"]
+    }
+  },
+  "include": ["*.ts"]
+}

@@ -8,7 +8,7 @@ import ts from "typescript";
 const fixtureDir = join(import.meta.dirname, "..", "fixtures", "strictness");
 const configPath = join(fixtureDir, "tsconfig.json");
 
-const { config, error } = ts.readConfigFile(configPath, ts.sys.readFile);
+const { config, error } = ts.readConfigFile(configPath, (path) => ts.sys.readFile(path));
 if (error) {
   console.error(ts.flattenDiagnosticMessageText(error.messageText, "\n"));
   process.exit(1);
