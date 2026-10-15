@@ -5,6 +5,8 @@ pre-commit:
   parallel: true
   jobs:
     - name: oxlint
+      # lint 対象外（JSON・YAML など）だけのコミットで oxlint が "No files found" で失敗しないよう絞る。
+      glob: "*.{js,mjs,cjs,jsx,ts,mts,cts,tsx}"
       run: bun oxlint --fix {staged_files}
       stage_fixed: true
     - name: oxfmt

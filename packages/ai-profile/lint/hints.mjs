@@ -1,6 +1,12 @@
 // 「直し方」の対応表。キーは oxlint の JSON 出力の `code`（plugin(rule)）。
 // ここに載っているルールはプロファイルが禁止する書き方で、
 // fixtures/lint/<rule>.invalid.ts と <rule>.valid.ts の両方が必須（check-fixtures.mjs が検査する）。
+// `any` を返す式（JSON.parse・res.json()・型のないライブラリ）の共通の直し方。
+const VALIDATE_ANY =
+  "`JSON.parse(text)` は `parseJson(Schema, text)`、`await res.json()` は `await readJson(Schema, res)`" +
+  "（`@ai-first-ts/ai-profile/core`）に置き換える。それ以外は `const raw: unknown = ...` で受け、" +
+  "Zod の `Schema.safeParse(raw)` で検証してから使う。";
+
 export const HINTS = {
   "typescript(no-explicit-any)":
     "`any` を `unknown` に置き換え、Zod の `schema.safeParse` か型ガード（typeof / in / instanceof）で絞り込んでから使う。" +
@@ -14,6 +20,28 @@ export const HINTS = {
   "typescript(ban-ts-comment)":
     "`@ts-ignore` / `@ts-expect-error` / `@ts-nocheck` を消し、型エラーそのものを直す。" +
     "ライブラリの型定義が誤っていて直せない場合は、回避せず実装を止めて報告する。",
+  // 暗黙の any（type-aware）。JSON.parse など `any` を返す式が型チェックを素通りするのを止める。
+  "typescript(no-unsafe-assignment)":
+    VALIDATE_ANY +
+    "型注釈 `const x: T = anyValue` は検証ではない。ライブラリの型が `any` を含む場合は、必要な値だけを受け取る形に引数を絞る。",
+  "typescript(no-unsafe-member-access)":
+    "`any` の値のプロパティを直接読まない。" +
+    VALIDATE_ANY +
+    "型が `error` と出る場合は型解決に失敗している（未生成のファイルや未ビルドのパッケージ）。先に `bun run check-types` を通す。",
+  "typescript(no-unsafe-call)":
+    "`any` の値を関数として呼ばない。" +
+    VALIDATE_ANY +
+    "関数を受け取るなら引数・変数に関数型（例: `() => void`）を付ける。",
+  "typescript(no-unsafe-return)":
+    "`any` をそのまま return しない。" +
+    VALIDATE_ANY +
+    "検証に失敗した場合は `err(...)` か `undefined` など戻り値の型で表す。",
+  "typescript(no-unsafe-argument)": "`any` を型付きの引数に渡さない。" + VALIDATE_ANY,
+  "typescript(no-floating-promises)":
+    "Promise を放置しない。結果やエラーを使うなら `await` し、失敗を Result で扱う。" +
+    "イベントハンドラなどで投げっぱなしが意図どおりなら `void promise` と明示する（失敗時の扱いはライブラリ側のコールバックで書く）。",
+  "typescript(await-thenable)":
+    "Promise でない値への `await` を消す。関数が同期なら直接呼ぶ。非同期のつもりなら関数の戻り値を `Promise<T>` にする。",
   "ai-profile(no-lint-disable)":
     "lint の無効化ディレクティブを消し、指摘されたルールに従ってコードを直す。" +
     "ルール自体が誤っていると判断した場合は .oxlintrc.json の変更を提案として報告する（人間の承認制）。",
@@ -45,4 +73,15 @@ export const HINTS = {
     "`userScoped` は認証済みセッションから apps/server/src/context.ts だけで作る（他人の userId でスコープを作らない）。" +
     "対象は userId 列を持つテーブルだけ。userId を持たないテーブル（共有データ）や複数テーブルの結合が必要なら、" +
     "回避せず @ai-first-ts/ai-profile/db へのアクセサ追加か lint/data-access-boundaries.mjs への追加を提案として報告する。",
+  "ai-profile(test-focus)":
+    "`test.only` / `.skip` / `.todo` / `.if` / `.skipIf` / `.todoIf` / `.failing` と `xit` / `xtest` / `xdescribe` を消し、" +
+    "全てのテストを常に実行する。落ちるテストは外さずにコードかテストを直す。未実装の振る舞いはテストを書かずに実装時に足す。" +
+    '`import * as t from "bun:test"` は `import { describe, expect, test } from "bun:test"` にする。',
+  "ai-profile(test-assertion)":
+    "各テスト `test(name, () => { ... })` の本体（インラインの関数）で `expect(...)` を呼び、振る舞いを検証する。" +
+    "例外が起きないことだけでなく戻り値・書き込んだ結果を比べる（例: `expect(result).toStrictEqual(ok(1))`）。" +
+    "分岐の中で expect する場合は先頭で `expect.assertions(n)` を呼ぶ。テストのないテストファイルは消すかテストを書く。",
+  "ai-profile(test-only)":
+    "テスト専用モジュール（testing.ts。メモリ上の DB や任意のユーザーのセッションを作る）はテストファイル（bun:test を使うファイル）" +
+    "か別の testing.ts からだけ import する。本番コードは認証済みのセッションと `context.data` を使う。",
 };

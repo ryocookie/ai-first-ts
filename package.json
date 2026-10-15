@@ -36,7 +36,7 @@
     "env:generate": "varlock codegen --path ./apps/web/ && varlock codegen --path ./apps/server/ && varlock codegen --path ./packages/db/",
     "postinstall": "varlock codegen --path ./apps/web/ && varlock codegen --path ./apps/server/ && varlock codegen --path ./packages/db/",
     "check": "oxlint && oxfmt --write",
-    "verify": "turbo run check-types && bun packages/ai-profile/lint/check-fixtures.mjs && bun packages/ai-profile/lint/run.mjs && oxfmt --check && bun packages/ai-profile/gate/check.mjs",
+    "verify": "turbo run check-types && bun packages/ai-profile/lint/check-fixtures.mjs && bun packages/ai-profile/lint/run.mjs && oxfmt --check && bun packages/ai-profile/test/run.mjs && bun packages/ai-profile/gate/check.mjs",
     "verify:quick": "bun packages/ai-profile/lint/run.mjs --quiet && bun packages/ai-profile/gate/check.mjs --quiet"
   },
   "dependencies": {
@@ -49,6 +49,7 @@
     "lefthook": "^2.2.1",
     "oxfmt": "^0.72.0",
     "oxlint": "^1.87.0",
+    "oxlint-tsgolint": "^7.0.2004",
     "turbo": "^2.11.7",
     "typescript": "catalog:",
     "varlock": "catalog:"
