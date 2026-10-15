@@ -73,6 +73,14 @@ export const HINTS = {
     "`userScoped` は認証済みセッションから apps/server/src/context.ts だけで作る（他人の userId でスコープを作らない）。" +
     "対象は userId 列を持つテーブルだけ。userId を持たないテーブル（共有データ）や複数テーブルの結合が必要なら、" +
     "回避せず @ai-first-ts/ai-profile/db へのアクセサ追加か lint/data-access-boundaries.mjs への追加を提案として報告する。",
+  "ai-profile(domain-purity)":
+    "ドメイン層（domain/ 配下）は同期の純粋関数だけで書く。必要な値は全て引数で受け取り、結果は戻り値（失敗は Result）で返す。" +
+    "I/O（fetch・DB・console・ストレージ）・現在時刻・乱数・ID 生成は app 層（oRPC のハンドラなど）で行い、" +
+    "その結果（例: `now: Date`・`id: string`・取得済みの行）を引数で渡す。そのため async / await / Promise も使わない。" +
+    "import できるのは `@ai-first-ts/ai-profile/core`・`zod` と、ドメイン層内の相対 import だけ。" +
+    "DB の行の型が必要なら、ドメイン側で必要な項目だけの型を定義する（構造的型付けでそのまま渡せる）。" +
+    "トップレベルの `let` / `var` は `const` にし、状態は引数と戻り値で受け渡す。" +
+    "他のモジュールがどうしても必要なら回避せず、lint/domain-boundaries.mjs の DOMAIN_IMPORTS への追加を提案として報告する。",
   "ai-profile(test-focus)":
     "`test.only` / `.skip` / `.todo` / `.if` / `.skipIf` / `.todoIf` / `.failing` と `xit` / `xtest` / `xdescribe` を消し、" +
     "全てのテストを常に実行する。落ちるテストは外さずにコードかテストを直す。未実装の振る舞いはテストを書かずに実装時に足す。" +

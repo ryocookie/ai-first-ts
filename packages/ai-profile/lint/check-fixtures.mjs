@@ -3,10 +3,12 @@
 // invalid は先頭の `// expect: <code>` のルールだけで失敗し、valid は診断ゼロであること。
 // 同じ違反を複数のルールが捕まえる場合は、2行目の `// also: <code>, <code>` に列挙する（列挙したものも必須）。
 // あわせて、throw の境界（throw-boundaries.mjs）・外部入力の境界（untrusted-boundaries.mjs）・
-// データアクセスの境界（data-access-boundaries.mjs）が許可する範囲を表形式のケースで検査する。
+// データアクセスの境界（data-access-boundaries.mjs）・ドメイン層の範囲（domain-boundaries.mjs）が許可する範囲を
+// 表形式のケースで検査する。
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
+import { findImpureDomainCode } from "./domain-purity.mjs";
 import { HINTS } from "./hints.mjs";
 import { findThrows } from "./no-throw.mjs";
 import { lint, repoRoot } from "./oxlint.mjs";
@@ -290,11 +292,97 @@ for (const { path, text, found } of userScopeCases) {
   }
 }
 
+// ドメイン層の範囲と import の許可もファイルパスで決まるため、パスと内容の組で検査する。
+const domain = "packages/api/src/domain/todo.ts";
+const domainCases = [
+  { path: domain, text: `import { ok } from "@ai-first-ts/ai-profile/core";`, found: 0 },
+  { path: domain, text: `import { z } from "zod";`, found: 0 },
+  { path: domain, text: `import { total } from "./price";`, found: 0 },
+  { path: domain, text: `import { total } from "../domain/price";`, found: 0 },
+  { path: "apps/web/src/domain/cart/a.ts", text: `import { total } from "..";`, found: 0 },
+  { path: domain, text: `import { todo } from "@ai-first-ts/db/schema/todo";`, found: 1 },
+  {
+    path: domain,
+    text: `import type { UserScopedDb } from "@ai-first-ts/ai-profile/db";`,
+    found: 1,
+  },
+  { path: domain, text: `import { protectedProcedure } from "../index";`, found: 1 },
+  { path: domain, text: `export * from "../routers/todo";`, found: 1 },
+  { path: domain, text: `import { z } from "zod/v4";`, found: 1 },
+  { path: domain, text: `import { describe } from "bun:test";`, found: 1 },
+  {
+    path: "packages/api/src/domain/todo.test.ts",
+    text: `import { test } from "bun:test";`,
+    found: 0,
+  },
+  { path: domain, text: `const load = () => import("node:fs");`, found: 1 },
+  { path: domain, text: `const load = (m: string) => import(m);`, found: 1 },
+  { path: domain, text: `import fs = require("node:fs");`, found: 1 },
+  { path: domain, text: `export const f = () => fetch("/x");`, found: 1 },
+  { path: domain, text: `export const f = (fetch: () => number) => fetch();`, found: 0 },
+  { path: domain, text: `export const f = (o: { fetch: number }) => o.fetch;`, found: 0 },
+  { path: domain, text: `export const f = () => ({ fetch });`, found: 1 },
+  {
+    path: domain,
+    text: `export const g = globalThis;\nexport const w = window.document;`,
+    found: 2,
+  },
+  { path: domain, text: `export const t = () => setTimeout(() => 1, 0);`, found: 1 },
+  { path: domain, text: `export const now = () => Date.now();`, found: 1 },
+  { path: domain, text: `export const now = () => new Date();`, found: 1 },
+  { path: domain, text: `export const now = () => Date();`, found: 1 },
+  { path: domain, text: `const D = Date;\nexport const now = () => D.now();`, found: 1 },
+  { path: domain, text: `export const d = (s: string) => new Date(Date.parse(s));`, found: 0 },
+  { path: domain, text: `export const r = () => Math.random();`, found: 1 },
+  { path: domain, text: `export const r = () => Math["random"]();`, found: 1 },
+  { path: domain, text: `export const m = (a: number) => Math.max(a, 0);`, found: 0 },
+  { path: domain, text: `export const id = () => crypto.randomUUID();`, found: 1 },
+  { path: domain, text: `export const e = (s: string) => eval(s);`, found: 1 },
+  { path: domain, text: `export const p = () => Promise.resolve(1);`, found: 1 },
+  {
+    path: domain,
+    text: `export async function f(g: () => Promise<number>) {\n  return await g();\n}`,
+    found: 2,
+  },
+  { path: domain, text: `export const f = async () => 1;`, found: 1 },
+  { path: domain, text: `export const u = import.meta.url;`, found: 1 },
+  { path: domain, text: `let count = 0;\nexport const next = () => ++count;`, found: 1 },
+  { path: domain, text: `var count = 0;`, found: 1 },
+  {
+    path: domain,
+    text: `export function f() {\n  let n = 0;\n  n += 1;\n  return n;\n}`,
+    found: 0,
+  },
+  {
+    path: domain,
+    text: `export type Log = typeof console;\nexport type P = Promise<number>;`,
+    found: 0,
+  },
+  { path: domain, text: `// fetch(url) and Date.now()\nexport const s = "console.log";`, found: 0 },
+  { path: domain, text: `export class Socket extends WebSocket {}`, found: 1 },
+  {
+    path: "packages/api/src/routers/todo.ts",
+    text: `export const now = () => Date.now();`,
+    found: 0,
+  },
+  { path: "packages/domainx/src/a.ts", text: `export const now = () => Date.now();`, found: 0 },
+];
+for (const { path, text, found } of domainCases) {
+  const actual = findImpureDomainCode(path, text).length;
+  if (actual !== found) {
+    failures.push(
+      `domain-purity case ${path}: expected ${found} violation(s), got ${actual}.\n${text}\n` +
+        `  直し方: lint/domain-purity.mjs と lint/domain-boundaries.mjs の判定を見直す。範囲の縮小・import の許可の追加は人間の承認が必要。`,
+    );
+  }
+}
+
 if (failures.length > 0) {
   console.error(`lint rule fixtures failed:\n\n${failures.join("\n\n")}`);
   process.exit(1);
 }
 console.log(
   `lint rule fixtures passed (${files.length} files, ${throwCases.length} no-throw and ` +
-    `${untrustedCases.length} untrusted-input and ${userScopeCases.length} user-scope boundary cases).`,
+    `${untrustedCases.length} untrusted-input and ${userScopeCases.length} user-scope boundary cases, ` +
+    `${domainCases.length} domain-purity cases).`,
 );
