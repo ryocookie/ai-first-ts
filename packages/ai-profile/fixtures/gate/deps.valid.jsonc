@@ -1,0 +1,12 @@
+// expect: gate(deps)
+// path: apps/web/package.json
+// allowlist のパッケージと、workspace: で参照するワークスペースのパッケージだけを依存に書く。
+{
+  "name": "web",
+  "dependencies": {
+    "@ai-first-ts/api": "workspace:*",
+    "react": "^19.0.0",
+    "zod": "catalog:",
+  },
+  "devDependencies": { "typescript": "catalog:" },
+}

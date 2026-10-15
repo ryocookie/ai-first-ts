@@ -1,0 +1,12 @@
+# expect: gate(codeowners)
+# path: .github/CODEOWNERS
+# allowlist の行がなく、後ろの所有者なしの行が .claude/hooks/ の所有を外している。
+/.claude/ @ryocookie
+/.github/ @ryocookie
+/lefthook.yml @ryocookie
+/.oxlintrc.json @ryocookie
+/.oxfmtrc.json @ryocookie
+/packages/config/tsconfig.base.json @ryocookie
+/packages/ai-profile/gate/ @ryocookie
+/packages/ai-profile/lint/*-boundaries.mjs @ryocookie
+/.claude/hooks/
