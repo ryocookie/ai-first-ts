@@ -73,4 +73,15 @@ export const HINTS = {
     "`userScoped` は認証済みセッションから apps/server/src/context.ts だけで作る（他人の userId でスコープを作らない）。" +
     "対象は userId 列を持つテーブルだけ。userId を持たないテーブル（共有データ）や複数テーブルの結合が必要なら、" +
     "回避せず @ai-first-ts/ai-profile/db へのアクセサ追加か lint/data-access-boundaries.mjs への追加を提案として報告する。",
+  "ai-profile(test-focus)":
+    "`test.only` / `.skip` / `.todo` / `.if` / `.skipIf` / `.todoIf` / `.failing` と `xit` / `xtest` / `xdescribe` を消し、" +
+    "全てのテストを常に実行する。落ちるテストは外さずにコードかテストを直す。未実装の振る舞いはテストを書かずに実装時に足す。" +
+    '`import * as t from "bun:test"` は `import { describe, expect, test } from "bun:test"` にする。',
+  "ai-profile(test-assertion)":
+    "各テスト `test(name, () => { ... })` の本体（インラインの関数）で `expect(...)` を呼び、振る舞いを検証する。" +
+    "例外が起きないことだけでなく戻り値・書き込んだ結果を比べる（例: `expect(result).toStrictEqual(ok(1))`）。" +
+    "分岐の中で expect する場合は先頭で `expect.assertions(n)` を呼ぶ。テストのないテストファイルは消すかテストを書く。",
+  "ai-profile(test-only)":
+    "テスト専用モジュール（testing.ts。メモリ上の DB や任意のユーザーのセッションを作る）はテストファイル（bun:test を使うファイル）" +
+    "か別の testing.ts からだけ import する。本番コードは認証済みのセッションと `context.data` を使う。",
 };

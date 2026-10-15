@@ -36,7 +36,8 @@
     "env:generate": "varlock codegen --path ./apps/web/ && varlock codegen --path ./apps/server/ && varlock codegen --path ./packages/db/",
     "postinstall": "varlock codegen --path ./apps/web/ && varlock codegen --path ./apps/server/ && varlock codegen --path ./packages/db/",
     "check": "oxlint && oxfmt --write",
-    "verify": "turbo run check-types && bun packages/ai-profile/lint/check-fixtures.mjs && bun packages/ai-profile/lint/run.mjs && oxfmt --check",
+    "verify": "turbo run check-types && bun packages/ai-profile/lint/check-fixtures.mjs && bun packages/ai-profile/lint/run.mjs && oxfmt --check && bun packages/ai-profile/test/run.mjs",
+    "test": "bun packages/ai-profile/test/run.mjs",
     "verify:quick": "bun packages/ai-profile/lint/run.mjs --quiet"
   },
   "dependencies": {

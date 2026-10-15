@@ -5,8 +5,14 @@
 declare module "bun:test" {
   type TestBody = () => void | Promise<void>;
 
-  export function test(name: string, fn: TestBody): void;
-  export function it(name: string, fn: TestBody): void;
+  interface TestFunction {
+    (name: string, fn: TestBody): void;
+    /** 表の行ごとに同じテストを実行する。name の %s / %d / %p に行の値が入る。 */
+    each<T>(table: readonly T[]): (name: string, fn: (row: T) => void | Promise<void>) => void;
+  }
+
+  export const test: TestFunction;
+  export const it: TestFunction;
   export function describe(name: string, fn: () => void): void;
   export function beforeEach(fn: TestBody): void;
   export function afterEach(fn: TestBody): void;
