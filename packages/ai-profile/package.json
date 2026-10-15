@@ -2,5 +2,14 @@
   "name": "@ai-first-ts/ai-profile",
   "version": "0.0.0",
   "private": true,
-  "type": "module"
+  "bin": {
+    "tsc-hints": "./bin/tsc-hints.mjs"
+  },
+  "type": "module",
+  "scripts": {
+    "check-types": "bun scripts/check-tsc-hints.mjs"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
 }
