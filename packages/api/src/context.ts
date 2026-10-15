@@ -1,7 +1,8 @@
+import type { UserScopedDb } from "@ai-first-ts/ai-profile/db";
 import type { Session } from "@ai-first-ts/auth";
-import type { Database } from "@ai-first-ts/db";
 
+// ハンドラには生の DB を渡さない。データはログイン中のユーザーに限定した data からだけ読み書きする。
 export type Context = {
   session: Session | null;
-  db: Database;
+  data: UserScopedDb | null;
 };

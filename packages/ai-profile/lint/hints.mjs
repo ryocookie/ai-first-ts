@@ -63,4 +63,14 @@ export const HINTS = {
     "`sql.raw(...)` は drizzle の sql タグ付きテンプレート（埋め込んだ値はパラメータとしてバインドされる）かクエリビルダに置き換える。" +
     "`dangerouslySetInnerHTML` は消し、テキストは JSX の子要素として渡して React にエスケープさせる。" +
     "どうしても HTML を挿入する必要がある場合は回避せず、実装を止めて報告する。",
+  "ai-profile(user-scope)":
+    "生の DB（createDb・Database・drizzle のドライバ・SQLite*Database 型・ENV.DB）を使わず、" +
+    "oRPC のハンドラなら `protectedProcedure` の `context.data`、それ以外なら引数で受け取った " +
+    '`UserScopedDb`（`import type { UserScopedDb } from "@ai-first-ts/ai-profile/db"`）で読み書きする。' +
+    "`data.select(table, where)` / `data.update(table, set, where)` / `data.delete(table, where)` は " +
+    "`userId = ログイン中のユーザー` の条件を自動で付けるので、where には絞り込み条件だけを書く。" +
+    "`data.insert(table, values)` の values.userId には `data.userId` を渡す。" +
+    "`userScoped` は認証済みセッションから apps/server/src/context.ts だけで作る（他人の userId でスコープを作らない）。" +
+    "対象は userId 列を持つテーブルだけ。userId を持たないテーブル（共有データ）や複数テーブルの結合が必要なら、" +
+    "回避せず @ai-first-ts/ai-profile/db へのアクセサ追加か lint/data-access-boundaries.mjs への追加を提案として報告する。",
 };

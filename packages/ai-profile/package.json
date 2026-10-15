@@ -7,13 +7,15 @@
   },
   "type": "module",
   "exports": {
-    "./core": "./core/index.ts"
+    "./core": "./core/index.ts",
+    "./db": "./db/index.ts"
   },
   "scripts": {
     "build": "tsc -b",
     "check-types": "bun bin/tsc-hints.mjs -b && bun scripts/check-tsc-hints.mjs"
   },
   "dependencies": {
+    "drizzle-orm": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

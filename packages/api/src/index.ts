@@ -9,14 +9,12 @@ export const publicProcedure = o;
 
 // oRPC の境界: 判定は requireSession（Result）で行い、失敗をここで ORPCError に変換する。
 const requireAuth = o.middleware(async ({ context, next }) => {
-  const session = requireSession(context.session);
-  if (!session.ok) {
-    throw new ORPCError(session.error.code);
+  const authenticated = requireSession(context);
+  if (!authenticated.ok) {
+    throw new ORPCError(authenticated.error.code);
   }
   return next({
-    context: {
-      session: session.value,
-    },
+    context: authenticated.value,
   });
 });
 
