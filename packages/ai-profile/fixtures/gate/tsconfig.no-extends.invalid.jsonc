@@ -1,0 +1,7 @@
+// expect: gate(tsconfig)
+// path: packages/x/tsconfig.json
+// base を継承しない tsconfig は、厳格設定を一切受け取らない。
+{
+  "compilerOptions": { "noEmit": true },
+  "include": ["src/**/*.ts"],
+}

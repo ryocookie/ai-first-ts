@@ -1,0 +1,6 @@
+// expect: gate(lint-config)
+// path: apps/web/.oxlintrc.json
+// 入れ子の設定ファイルはそのディレクトリでルートの設定を上書きする。中身に関係なく置けない。
+{
+  "rules": { "typescript/no-explicit-any": "error" },
+}

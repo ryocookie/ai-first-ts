@@ -1,0 +1,11 @@
+# expect: gate(codeowners)
+# path: .github/CODEOWNERS
+/.claude/ @ryocookie
+/.github/ @ryocookie
+/lefthook.yml @ryocookie
+/.oxlintrc.json @ryocookie
+/.oxfmtrc.json @ryocookie
+/packages/config/tsconfig.base.json @ryocookie
+/packages/ai-profile/allowlist.json @ryocookie
+/packages/ai-profile/gate/ @ryocookie
+/packages/ai-profile/lint/*-boundaries.mjs @ryocookie

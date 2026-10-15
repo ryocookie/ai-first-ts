@@ -1,0 +1,11 @@
+// expect: gate(tsconfig)
+// path: apps/web/tsconfig.json
+// base を継承し、厳格度と関係ない設定（jsx・paths など）だけを足す。
+{
+  "extends": "@ai-first-ts/config/tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "paths": { "@/*": ["./src/*"] },
+  },
+}

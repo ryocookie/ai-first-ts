@@ -1,0 +1,11 @@
+// expect: gate(tsconfig)
+// path: apps/web/tsconfig.json
+// base を継承したまま、型エラーを黙らせるために厳格系オプションを個別に戻す。
+{
+  "extends": "@ai-first-ts/config/tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "strictNullChecks": false,
+    "noUncheckedIndexedAccess": false,
+  },
+}

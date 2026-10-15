@@ -1,0 +1,10 @@
+// expect: gate(lint-config)
+// path: .oxlintrc.json
+// 禁止ルールのフィクスチャは残したまま、アプリのコードだけを対象外にする・overrides で切る迂回。
+{
+  "plugins": ["typescript"],
+  "categories": { "correctness": "warn" },
+  "rules": { "typescript/no-explicit-any": "error" },
+  "overrides": [{ "files": ["apps/**"], "rules": { "typescript/no-explicit-any": "off" } }],
+  "ignorePatterns": ["packages/ai-profile/fixtures/**", "apps/web/src/legacy/**"],
+}
