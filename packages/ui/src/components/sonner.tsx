@@ -16,6 +16,14 @@ type SonnerTheme = NonNullable<ToasterProps["theme"]>;
 const toSonnerTheme = (theme: string | undefined): SonnerTheme =>
   theme === "light" || theme === "dark" ? theme : "system";
 
+// React.CSSProperties has no CSS custom properties, so widen it with a `--*` index signature.
+const toasterStyle: React.CSSProperties & Record<`--${string}`, string> = {
+  "--normal-bg": "var(--popover)",
+  "--normal-text": "var(--popover-foreground)",
+  "--normal-border": "var(--border)",
+  "--border-radius": "var(--radius)",
+};
+
 const Toaster = ({ ...props }: ToasterProps) => {
   const { theme } = useTheme();
 
@@ -30,14 +38,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
         error: <OctagonXIcon className="size-4" />,
         loading: <Loader2Icon className="size-4 animate-spin" />,
       }}
-      style={
-        {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
-          "--border-radius": "var(--radius)",
-        } as React.CSSProperties
-      }
+      style={toasterStyle}
       toastOptions={{
         classNames: {
           toast: "cn-toast",
