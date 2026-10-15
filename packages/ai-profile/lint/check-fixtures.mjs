@@ -77,6 +77,7 @@ for (const name of files.sort()) {
         (expected.startsWith("ai-profile(")
           ? `  直し方: packages/ai-profile/lint/ の独自検査（${ruleName(expected)}）が外れていないか確認して戻す。`
           : `  直し方: .oxlintrc.json で "${expected.replace("(", "/").replace(")", "")}" を "error" に戻す。`) +
+        `型情報を使うルール（no-unsafe-* など）なら "options": { "typeAware": true } も戻す。` +
         `無効化・緩和は人間の承認が必要。`,
     );
   }

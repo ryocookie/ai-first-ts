@@ -1,20 +1,15 @@
 import type { Context as ApiContext } from "@ai-first-ts/api/context";
-import type { Context as HonoContext } from "hono";
 
 import { getDb } from "./services";
 import { createAuth } from "./services";
 
 export type CreateContextOptions = {
-  context: HonoContext;
+  headers: Headers;
 };
 
-export async function createContext({ context }: CreateContextOptions): Promise<ApiContext> {
-  const db = await getDb();
-  const session = await (
-    await createAuth(db)
-  ).api.getSession({
-    headers: context.req.raw.headers,
-  });
+export async function createContext({ headers }: CreateContextOptions): Promise<ApiContext> {
+  const db = getDb();
+  const session = await (await createAuth(db)).api.getSession({ headers });
   return {
     db,
     session,

@@ -14,6 +14,26 @@ export const HINTS = {
   "typescript(ban-ts-comment)":
     "`@ts-ignore` / `@ts-expect-error` / `@ts-nocheck` を消し、型エラーそのものを直す。" +
     "ライブラリの型定義が誤っていて直せない場合は、回避せず実装を止めて報告する。",
+  // 暗黙の any（type-aware）。JSON.parse など `any` を返す式が型チェックを素通りするのを止める。
+  "typescript(no-unsafe-assignment)":
+    "`JSON.parse`・`res.json()`・型のないライブラリなど `any` を返す式は、まず `const raw: unknown = ...` で受け、Zod の `schema.safeParse(raw)` で検証してから使う。" +
+    "型注釈 `const x: T = anyValue` は検証ではない。ライブラリの型が `any` を含む場合は、必要な値だけを受け取る形に引数を絞る。",
+  "typescript(no-unsafe-member-access)":
+    "`any` の値のプロパティを直接読まない。`JSON.parse`・`res.json()`・型のないライブラリなど `any` を返す式は、まず `const raw: unknown = ...` で受け、Zod の `schema.safeParse(raw)` で検証してから使う。" +
+    "型が `error` と出る場合は型解決に失敗している（未生成のファイルや未ビルドのパッケージ）。先に `bun run check-types` を通す。",
+  "typescript(no-unsafe-call)":
+    "`any` の値を関数として呼ばない。`JSON.parse`・`res.json()`・型のないライブラリなど `any` を返す式は、まず `const raw: unknown = ...` で受け、Zod の `schema.safeParse(raw)` で検証してから使う。" +
+    "関数を受け取るなら引数・変数に関数型（例: `() => void`）を付ける。",
+  "typescript(no-unsafe-return)":
+    "`any` をそのまま return しない。`JSON.parse`・`res.json()`・型のないライブラリなど `any` を返す式は、まず `const raw: unknown = ...` で受け、Zod の `schema.safeParse(raw)` で検証してから使う。" +
+    "検証に失敗した場合は `err(...)` か `undefined` など戻り値の型で表す。",
+  "typescript(no-unsafe-argument)":
+    "`any` を型付きの引数に渡さない。`JSON.parse`・`res.json()`・型のないライブラリなど `any` を返す式は、まず `const raw: unknown = ...` で受け、Zod の `schema.safeParse(raw)` で検証してから使う。",
+  "typescript(no-floating-promises)":
+    "Promise を放置しない。結果やエラーを使うなら `await` し、失敗を Result で扱う。" +
+    "イベントハンドラなどで投げっぱなしが意図どおりなら `void promise` と明示する（失敗時の扱いはライブラリ側のコールバックで書く）。",
+  "typescript(await-thenable)":
+    "Promise でない値への `await` を消す。関数が同期なら直接呼ぶ。非同期のつもりなら関数の戻り値を `Promise<T>` にする。",
   "ai-profile(no-lint-disable)":
     "lint の無効化ディレクティブを消し、指摘されたルールに従ってコードを直す。" +
     "ルール自体が誤っていると判断した場合は .oxlintrc.json の変更を提案として報告する（人間の承認制）。",
