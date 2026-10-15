@@ -6,18 +6,15 @@
     "./*": "./src/*.ts"
   },
   "scripts": {
-    "check-types": "tsc --noEmit",
-    "db:local": "turso dev --db-file local.db",
-    "db:push": "drizzle-kit push",
+    "build": "tsc -b",
+    "check-types": "tsc -b",
     "db:generate": "drizzle-kit generate",
-    "db:migrate:deploy": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate:deploy": "drizzle-kit migrate"
   },
   "dependencies": {
     "@libsql/client": "0.18.0",
     "drizzle-orm": "catalog:",
-    "libsql": "catalog:",
+    "libsql": "0.5.29",
     "zod": "catalog:"
   },
   "devDependencies": {

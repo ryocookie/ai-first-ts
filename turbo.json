@@ -5,51 +5,30 @@
     "build": {
       "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": ["dist/**", "artifacts/**"]
+      "outputs": ["dist/**"]
     },
     "lint": {
       "dependsOn": ["^lint"]
     },
     "check-types": {
-      "dependsOn": ["^check-types"]
+      "dependsOn": ["^check-types"],
+      "outputs": ["dist/**"]
     },
     "dev": {
       "cache": false,
       "persistent": true
     },
-    "dev:hmr": {
-      "cache": false,
-      "persistent": true
-    },
-    "build:stable": {
-      "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": ["artifacts/**", "build/**"]
-    },
-    "build:canary": {
-      "dependsOn": ["^build"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
-      "outputs": ["artifacts/**", "build/**"]
-    },
-    "db:push": {
-      "cache": false,
-      "interactive": true
-    },
     "db:generate": {
       "cache": false,
       "interactive": true
     },
-    "db:migrate": {
+    "deploy": {
       "cache": false,
       "interactive": true
     },
-    "db:studio": {
+    "destroy": {
       "cache": false,
-      "persistent": true
-    },
-    "db:local": {
-      "cache": false,
-      "persistent": true
+      "interactive": true
     }
   },
   "globalEnv": [
@@ -57,8 +36,6 @@
     "BETTER_AUTH_URL",
     "CI",
     "CORS_ORIGIN",
-    "DATABASE_URL",
-    "GOOGLE_GENERATIVE_AI_API_KEY",
     "NODE_ENV",
     "VERCEL",
     "VERCEL_ENV",

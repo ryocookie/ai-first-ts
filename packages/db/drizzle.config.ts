@@ -4,8 +4,7 @@ import "varlock/auto-load";
 export default defineConfig({
   schema: "./src/schema/index.ts",
   out: "./src/migrations",
-  dialect: "turso",
-  dbCredentials: {
-    url: process.env.DATABASE_URL || "",
-  },
+  // DOCS: https://orm.drizzle.team/docs/guides/d1-http-with-drizzle-kit
+  dialect: "sqlite",
+  driver: "d1-http",
 });

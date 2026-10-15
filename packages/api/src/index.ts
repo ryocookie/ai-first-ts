@@ -1,25 +1,20 @@
-import { initTRPC, TRPCError } from "@trpc/server";
+import { ORPCError, os } from "@orpc/server";
 
 import type { Context } from "./context";
 
-export const t = initTRPC.context<Context>().create();
+export const o = os.$context<Context>();
 
-export const router = t.router;
+export const publicProcedure = o;
 
-export const publicProcedure = t.procedure;
-
-export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
-  if (!ctx.session) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: "Authentication required",
-      cause: "No session",
-    });
+const requireAuth = o.middleware(async ({ context, next }) => {
+  if (!context.session?.user) {
+    throw new ORPCError("UNAUTHORIZED");
   }
   return next({
-    ctx: {
-      ...ctx,
-      session: ctx.session,
+    context: {
+      session: context.session,
     },
   });
 });
+
+export const protectedProcedure = publicProcedure.use(requireAuth);

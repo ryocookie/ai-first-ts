@@ -1,7 +1,11 @@
-import { createAuth } from "@ai-first-ts/auth";
-import { createDb } from "@ai-first-ts/db";
+import { createAuth as createConfiguredAuth } from "@ai-first-ts/auth";
+import { type Database, createDb } from "@ai-first-ts/db";
 
-import { ENV, desktopOrigins } from "./env.server";
+import { ENV } from "./env.server";
 
-export const db = createDb(ENV);
-export const auth = createAuth(ENV, db, desktopOrigins);
+export function getDb(): Database {
+  return createDb(ENV);
+}
+export async function createAuth(database?: Database) {
+  return createConfiguredAuth(ENV, database ?? (await getDb()));
+}

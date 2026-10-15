@@ -1,6 +1,12 @@
 {
   "extends": "@ai-first-ts/config/tsconfig.base.json",
   "compilerOptions": {
-    "noEmit": true
-  }
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "outDir": "dist"
+  },
+  "include": ["src/**/*.ts"],
+  "references": [{ "path": "../db" }]
 }

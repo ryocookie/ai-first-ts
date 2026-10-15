@@ -6,7 +6,8 @@
     "./*": "./src/*.ts"
   },
   "scripts": {
-    "check-types": "tsc --noEmit"
+    "build": "tsc -b",
+    "check-types": "tsc -b"
   },
   "dependencies": {
     "@ai-first-ts/db": "workspace:*",

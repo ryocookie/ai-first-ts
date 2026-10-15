@@ -1,3 +1,4 @@
+/// <reference types="@cloudflare/workers-types" />
 export type DatabaseConfig = {
-  DATABASE_URL: string;
+  DB: D1Database;
 };
