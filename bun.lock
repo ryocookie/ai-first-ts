@@ -81,6 +81,10 @@
         "web-vitals": "^6.2.3",
       },
     },
+    "packages/ai-profile": {
+      "name": "@ai-first-ts/ai-profile",
+      "version": "0.0.0",
+    },
     "packages/api": {
       "name": "@ai-first-ts/api",
       "dependencies": {
@@ -189,6 +193,8 @@
     "zod": "^4.5.4",
   },
   "packages": {
+    "@ai-first-ts/ai-profile": ["@ai-first-ts/ai-profile@workspace:packages/ai-profile"],
+
     "@ai-first-ts/api": ["@ai-first-ts/api@workspace:packages/api"],
 
     "@ai-first-ts/auth": ["@ai-first-ts/auth@workspace:packages/auth"],
