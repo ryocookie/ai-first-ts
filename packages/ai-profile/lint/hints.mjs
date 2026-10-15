@@ -17,4 +17,10 @@ export const HINTS = {
   "ai-profile(no-lint-disable)":
     "lint の無効化ディレクティブを消し、指摘されたルールに従ってコードを直す。" +
     "ルール自体が誤っていると判断した場合は .oxlintrc.json の変更を提案として報告する（人間の承認制）。",
+  "ai-profile(no-throw)":
+    '`throw` を消し、失敗を戻り値で表す。`import { err, ok, type Result } from "@ai-first-ts/ai-profile/core"` で ' +
+    '戻り値を `Result<T, E>` にし、失敗は `return err({ type: "NotFound" })` のように判別可能な値で返す。' +
+    "throw しうるライブラリ呼び出しは `tryCatch` / `tryCatchAsync` で Result に変換する。" +
+    "境界（packages/api の ORPCError、apps/web/src/routes の redirect / notFound）では Result を受けてそこで throw する。" +
+    "それ以外の場所で throw が必要なら回避せず、lint/throw-boundaries.mjs への追加を提案として報告する。",
 };

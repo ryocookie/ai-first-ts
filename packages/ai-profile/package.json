@@ -6,10 +6,15 @@
     "tsc-hints": "./bin/tsc-hints.mjs"
   },
   "type": "module",
+  "exports": {
+    "./core": "./core/index.ts"
+  },
   "scripts": {
-    "check-types": "bun scripts/check-tsc-hints.mjs"
+    "build": "tsc -b",
+    "check-types": "bun bin/tsc-hints.mjs -b && bun scripts/check-tsc-hints.mjs"
   },
   "devDependencies": {
+    "@ai-first-ts/config": "workspace:*",
     "typescript": "catalog:"
   }
 }

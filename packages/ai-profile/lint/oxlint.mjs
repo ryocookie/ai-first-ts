@@ -1,7 +1,8 @@
-// oxlint を JSON 出力で実行し、プロファイル独自の検査（lint 無効化ディレクティブの禁止）を加えた診断を返す。
+// oxlint を JSON 出力で実行し、プロファイル独自の検査（lint 無効化ディレクティブと throw の禁止）を加えた診断を返す。
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { findThrows } from "./no-throw.mjs";
 
 export const repoRoot = join(import.meta.dirname, "..", "..", "..");
 const oxlintBin = join(repoRoot, "node_modules", ".bin", "oxlint");
@@ -18,22 +19,23 @@ function runOxlint(args) {
   return result;
 }
 
-function findDisableDirectives(args) {
+function findProfileViolations(args) {
   // oxlint 自身に対象ファイルを列挙させ、ignorePatterns と引数の解釈を揃える。
   const listed = runOxlint([...args, "--debug=files"]);
   const files = listed.stdout.split("\n").filter((line) => line.length > 0);
   const diagnostics = [];
   for (const file of files) {
-    const lines = readFileSync(join(repoRoot, file), "utf8").split("\n");
-    lines.forEach((text, index) => {
-      if (disableDirective.test(text)) {
+    const text = readFileSync(join(repoRoot, file), "utf8");
+    diagnostics.push(...findThrows(file, text));
+    text.split("\n").forEach((line, index) => {
+      if (disableDirective.test(line)) {
         diagnostics.push({
           code: "ai-profile(no-lint-disable)",
           severity: "error",
           message: "Inline lint disable directives are not allowed.",
           filename: file,
           line: index + 1,
-          column: text.search(disableDirective) + 1,
+          column: line.search(disableDirective) + 1,
         });
       }
     });
@@ -57,5 +59,5 @@ export function lint(args) {
     line: d.labels[0]?.span.line ?? 0,
     column: d.labels[0]?.span.column ?? 0,
   }));
-  return [...diagnostics, ...findDisableDirectives(args)];
+  return [...diagnostics, ...findProfileViolations(args)];
 }
