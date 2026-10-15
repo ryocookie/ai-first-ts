@@ -22,6 +22,12 @@ export const DATA_ACCESS_BOUNDARIES = [
     reason: "userScoped をパッケージの入口から公開する",
   },
   {
+    files: /^packages\/ai-profile\/db\/testing\.ts$/,
+    sources: ["database", "scope"],
+    reason:
+      "テスト専用のメモリ上の DB（sqlite-proxy）から userScoped を作る。テスト以外からの import は ai-profile(test-only) が禁止する",
+  },
+  {
     files: /^packages\/auth\/src\/index\.ts$/,
     sources: ["database"],
     reason:
