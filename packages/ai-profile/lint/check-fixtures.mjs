@@ -119,6 +119,16 @@ const throwCases = [
     throws: 0,
   },
   { path: "packages/x/src/a.ts", text: `const f = () => {\n  throw 1;\n};`, throws: 1 },
+  { path: "packages/x/src/a.ts", text: `const p = Promise.reject(new Error("x"));`, throws: 1 },
+  { path: "packages/x/src/a.ts", text: `const p = (Promise)["reject"]("x");`, throws: 1 },
+  { path: "packages/api/src/index.ts", text: `const p = Promise.reject("x");`, throws: 1 },
+  {
+    path: "packages/x/src/a.test.ts",
+    text: `const p = Promise.reject(new Error("x"));`,
+    throws: 0,
+  },
+  { path: "packages/x/src/a.test.ts", text: `throw new Error("x");`, throws: 1 },
+  { path: "packages/x/src/a.ts", text: `const p = Promise.resolve(1);`, throws: 0 },
 ];
 for (const { path, text, throws } of throwCases) {
   const found = findThrows(path, text).length;
