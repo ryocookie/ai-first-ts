@@ -1,4 +1,5 @@
 // expect: ai-profile(untrusted-input)
+// also: typescript(no-unsafe-assignment), typescript(no-unsafe-return)
 // Each value reaches the program with a type no schema has checked.
 import { type } from "@orpc/server";
 import { z } from "zod";

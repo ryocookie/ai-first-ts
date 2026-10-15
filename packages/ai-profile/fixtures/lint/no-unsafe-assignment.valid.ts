@@ -1,9 +1,9 @@
-// Validate the parsed value with Zod; the result type comes from the schema.
+// Receive the value as `unknown` and validate it with Zod; the result type comes from the schema.
 import { z } from "zod";
 
 const Config = z.object({ port: z.number() });
 
-export function readConfig(text: string): z.ZodSafeParseResult<z.infer<typeof Config>> {
-  const parsed: unknown = JSON.parse(text);
-  return Config.safeParse(parsed);
+export function readConfig(source: object): z.ZodSafeParseResult<z.infer<typeof Config>> {
+  const raw: unknown = Reflect.get(source, "config");
+  return Config.safeParse(raw);
 }

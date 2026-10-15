@@ -1,6 +1,12 @@
 // 「直し方」の対応表。キーは oxlint の JSON 出力の `code`（plugin(rule)）。
 // ここに載っているルールはプロファイルが禁止する書き方で、
 // fixtures/lint/<rule>.invalid.ts と <rule>.valid.ts の両方が必須（check-fixtures.mjs が検査する）。
+// `any` を返す式（JSON.parse・res.json()・型のないライブラリ）の共通の直し方。
+const VALIDATE_ANY =
+  "`JSON.parse(text)` は `parseJson(Schema, text)`、`await res.json()` は `await readJson(Schema, res)`" +
+  "（`@ai-first-ts/ai-profile/core`）に置き換える。それ以外は `const raw: unknown = ...` で受け、" +
+  "Zod の `Schema.safeParse(raw)` で検証してから使う。";
+
 export const HINTS = {
   "typescript(no-explicit-any)":
     "`any` を `unknown` に置き換え、Zod の `schema.safeParse` か型ガード（typeof / in / instanceof）で絞り込んでから使う。" +
@@ -16,19 +22,21 @@ export const HINTS = {
     "ライブラリの型定義が誤っていて直せない場合は、回避せず実装を止めて報告する。",
   // 暗黙の any（type-aware）。JSON.parse など `any` を返す式が型チェックを素通りするのを止める。
   "typescript(no-unsafe-assignment)":
-    "`JSON.parse`・`res.json()`・型のないライブラリなど `any` を返す式は、まず `const raw: unknown = ...` で受け、Zod の `schema.safeParse(raw)` で検証してから使う。" +
+    VALIDATE_ANY +
     "型注釈 `const x: T = anyValue` は検証ではない。ライブラリの型が `any` を含む場合は、必要な値だけを受け取る形に引数を絞る。",
   "typescript(no-unsafe-member-access)":
-    "`any` の値のプロパティを直接読まない。`JSON.parse`・`res.json()`・型のないライブラリなど `any` を返す式は、まず `const raw: unknown = ...` で受け、Zod の `schema.safeParse(raw)` で検証してから使う。" +
+    "`any` の値のプロパティを直接読まない。" +
+    VALIDATE_ANY +
     "型が `error` と出る場合は型解決に失敗している（未生成のファイルや未ビルドのパッケージ）。先に `bun run check-types` を通す。",
   "typescript(no-unsafe-call)":
-    "`any` の値を関数として呼ばない。`JSON.parse`・`res.json()`・型のないライブラリなど `any` を返す式は、まず `const raw: unknown = ...` で受け、Zod の `schema.safeParse(raw)` で検証してから使う。" +
+    "`any` の値を関数として呼ばない。" +
+    VALIDATE_ANY +
     "関数を受け取るなら引数・変数に関数型（例: `() => void`）を付ける。",
   "typescript(no-unsafe-return)":
-    "`any` をそのまま return しない。`JSON.parse`・`res.json()`・型のないライブラリなど `any` を返す式は、まず `const raw: unknown = ...` で受け、Zod の `schema.safeParse(raw)` で検証してから使う。" +
+    "`any` をそのまま return しない。" +
+    VALIDATE_ANY +
     "検証に失敗した場合は `err(...)` か `undefined` など戻り値の型で表す。",
-  "typescript(no-unsafe-argument)":
-    "`any` を型付きの引数に渡さない。`JSON.parse`・`res.json()`・型のないライブラリなど `any` を返す式は、まず `const raw: unknown = ...` で受け、Zod の `schema.safeParse(raw)` で検証してから使う。",
+  "typescript(no-unsafe-argument)": "`any` を型付きの引数に渡さない。" + VALIDATE_ANY,
   "typescript(no-floating-promises)":
     "Promise を放置しない。結果やエラーを使うなら `await` し、失敗を Result で扱う。" +
     "イベントハンドラなどで投げっぱなしが意図どおりなら `void promise` と明示する（失敗時の扱いはライブラリ側のコールバックで書く）。",

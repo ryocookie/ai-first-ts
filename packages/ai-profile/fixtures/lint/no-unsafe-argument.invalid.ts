@@ -4,6 +4,6 @@ function double(value: number): number {
   return value * 2;
 }
 
-export function doubleInput(text: string): number {
-  return double(JSON.parse(text));
+export function doublePort(source: object): number {
+  return double(Reflect.get(source, "port"));
 }

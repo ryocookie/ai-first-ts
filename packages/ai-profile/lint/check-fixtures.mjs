@@ -1,6 +1,7 @@
 // .oxlintrc.json が禁止ルールを強制し続けていることを検査する:
 // HINTS の各ルールに fixtures/lint/<rule>.invalid.ts と <rule>.valid.ts があり、
 // invalid は先頭の `// expect: <code>` のルールだけで失敗し、valid は診断ゼロであること。
+// 同じ違反を複数のルールが捕まえる場合は、2行目の `// also: <code>, <code>` に列挙する（列挙したものも必須）。
 // あわせて、throw の境界（throw-boundaries.mjs）と外部入力の境界（untrusted-boundaries.mjs）が
 // 許可する範囲を表形式のケースで検査する。
 import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
@@ -71,11 +72,13 @@ for (const name of files.sort()) {
     continue;
   }
   const [, expected] = header;
-  const unexpected = codes.filter((c) => c !== expected);
-  if (!codes.includes(expected) || unexpected.length > 0) {
+  const also = /^.*\n\/\/ also: (.+)/.exec(readFileSync(join(fixtureDir, name), "utf8"));
+  const required = [expected, ...(also?.[1].split(",").map((c) => c.trim()) ?? [])];
+  const unexpected = codes.filter((c) => !required.includes(c));
+  if (required.some((c) => !codes.includes(c)) || unexpected.length > 0) {
     const got = codes.length > 0 ? codes.join(", ") : "no diagnostics";
     failures.push(
-      `${name}: expected only ${expected} but got ${got}.\n` +
+      `${name}: expected only ${required.join(", ")} but got ${got}.\n` +
         (expected.startsWith("ai-profile(")
           ? `  直し方: packages/ai-profile/lint/ の独自検査（${ruleName(expected)}）が外れていないか確認して戻す。`
           : `  直し方: .oxlintrc.json で "${expected.replace("(", "/").replace(")", "")}" を "error" に戻す。`) +
