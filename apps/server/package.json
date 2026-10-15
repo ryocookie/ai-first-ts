@@ -1,0 +1,36 @@
+{
+  "name": "server",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "build": "tsdown",
+    "check-types": "tsc --noEmit",
+    "compile": "bun build --compile --no-compile-autoload-dotenv --minify --sourcemap --bytecode ./src/index.ts --outfile server",
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run dist/index.mjs",
+    "env:generate": "varlock codegen",
+    "auth:generate": "varlock run -- bun x auth@latest generate --config src/services.ts --output ../../packages/db/src/schema/auth.ts --yes"
+  },
+  "dependencies": {
+    "@ai-first-ts/api": "workspace:*",
+    "@ai-first-ts/auth": "workspace:*",
+    "@ai-first-ts/db": "workspace:*",
+    "@ai-sdk/devtools": "^1.0.15",
+    "@ai-sdk/google": "^4.0.64",
+    "@hono/trpc-server": "^0.4.2",
+    "@trpc/server": "catalog:",
+    "ai": "catalog:",
+    "better-auth": "catalog:",
+    "evlog": "^2.30.1",
+    "hono": "^4.13.7",
+    "libsql": "catalog:",
+    "varlock": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@ai-first-ts/config": "workspace:*",
+    "@types/bun": "catalog:",
+    "tsdown": "^0.23.0",
+    "typescript": "catalog:"
+  }
+}

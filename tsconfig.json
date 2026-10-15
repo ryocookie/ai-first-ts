@@ -1,0 +1,3 @@
+{
+  "extends": "@ai-first-ts/config/tsconfig.base.json"
+}

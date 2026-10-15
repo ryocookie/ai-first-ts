@@ -1,0 +1,6 @@
+{
+  "extends": "@ai-first-ts/config/tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true
+  }
+}
