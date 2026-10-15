@@ -1,5 +1,12 @@
 {
   "name": "@ai-first-ts/config",
   "version": "0.0.0",
-  "private": true
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check-types": "bun scripts/check-fixtures.mjs"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
 }
