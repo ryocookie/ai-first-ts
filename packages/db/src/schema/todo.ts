@@ -14,7 +14,8 @@ export const todo = sqliteTable(
       .references(() => user.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     completed: integer("completed", { mode: "boolean" }).default(false).notNull(),
-    dueAt: integer("due_at", { mode: "timestamp_ms" }),
+    /** 期限日（YYYY-MM-DD）。時刻とタイムゾーンを持たない暦日として扱う。 */
+    dueOn: text("due_on"),
     createdAt: integer("created_at", { mode: "timestamp_ms" })
       .default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
       .notNull(),
