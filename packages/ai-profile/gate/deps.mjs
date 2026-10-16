@@ -2,7 +2,7 @@
 // .claude/hooks/guard.mjs は `bun add <pkg>` しか見られないため、package.json を直接編集して
 // `bun install` する迂回を、ここ（verify と guard の両方から呼ばれる）で塞ぐ。
 // 依存ファイルだけを読む純粋な検査で、node_modules がなくても動く（guard が install 前に呼ぶ）。
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const DEPENDENCY_FIELDS = [
@@ -20,11 +20,27 @@ export const DEPS_HINT =
   "allowlist.json にないパッケージは依存に書けない（slopsquatting 対策）。" +
   "package.json から外し、必要なら実装を止めてパッケージ名・用途・npm 上の公開元・代替案を報告する（allowlist の追加は人間の承認制）。";
 
-/** @param {string} root リポジトリルート */
+/**
+ * allowlist.json と、導入モードなら ai-profile.config.json の dependencies（導入時からあった依存）。
+ * 設定もゲートファイルなので、依存を足すにはどちらにしても人間の承認が要る。
+ * @param {string} root リポジトリルート
+ */
 export function loadAllowlist(root) {
-  return new Set(
+  const allow = new Set(
     JSON.parse(readFileSync(join(root, "packages/ai-profile/allowlist.json"), "utf8")).packages,
   );
+  const configPath = join(root, "ai-profile.config.json");
+  if (existsSync(configPath)) {
+    try {
+      const { dependencies } = JSON.parse(readFileSync(configPath, "utf8"));
+      for (const name of Array.isArray(dependencies) ? dependencies : []) {
+        allow.add(String(name));
+      }
+    } catch {
+      // 読めない設定は gate(adopt-config) が報告する。依存は allowlist.json の分だけを許す。
+    }
+  }
+  return allow;
 }
 
 /** `npm:real-name@^1` のような別名指定子から実体のパッケージ名を取り出す。 */

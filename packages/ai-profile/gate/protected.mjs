@@ -52,6 +52,22 @@ export const PROTECTED_PATHS = [
     codeowners: "/packages/ai-profile/db/",
     reason: "ユーザースコープのデータアクセス（認可）",
   },
+  // 既存のリポジトリへの導入（adopt/）。導入先では、設定とベースラインもゲートになる。
+  {
+    pattern: /^packages\/ai-profile\/adopt\//,
+    codeowners: "/packages/ai-profile/adopt/",
+    reason: "導入（init）とベースラインとの比較",
+  },
+  {
+    pattern: /^ai-profile\.config\.json$/,
+    codeowners: "/ai-profile.config.json",
+    reason: "導入先で層ごとに有効にするルールと例外・導入時からある依存",
+  },
+  {
+    pattern: /^ai-profile\.baseline\.json$/,
+    codeowners: "/ai-profile.baseline.json",
+    reason: "導入時からある違反（これより増えた分を落とす）",
+  },
 ];
 
 /** @param {string} path リポジトリルートからの相対パス（ディレクトリなら末尾の / はあってもなくてもよい） */

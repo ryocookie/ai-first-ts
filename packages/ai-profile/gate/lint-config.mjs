@@ -27,11 +27,24 @@ export function isLintOrFormatConfig(path) {
   return LINT_CONFIG_FILE.test(path) || FORMAT_CONFIG_FILE.test(path);
 }
 
+// oxlint / oxfmt の設定ファイル。導入モードでは、移行中の ESLint・Prettier の設定は残してよい（oxlint / oxfmt の検査を緩められない）ため、これだけを見る。
+const OXC_CONFIG_FILE =
+  /(?:^|\/)(?:\.oxlintrc(?:\.\w+)?|oxlint\.config\.\w+|\.oxfmtrc(?:\.\w+)?|oxfmt\.config\.\w+)$/;
+
+/** @param {string} path リポジトリルートからの相対パス */
+export function isOxcConfig(path) {
+  return OXC_CONFIG_FILE.test(path);
+}
+
 /**
  * @param {string} path リポジトリルートからの相対パス
  * @param {unknown} config 設定ファイルの内容（JSON のとき。それ以外は undefined）
+ * @param {{ lintIgnores?: readonly string[], formatIgnores?: readonly string[] }} [allowed]
+ *   対象外にしてよいパス。導入モードでは、開発元で検査済みのプロファイル本体（packages/ai-profile/**）を対象外にできる。
  */
-export function findLooseLintConfig(path, config) {
+export function findLooseLintConfig(path, config, allowed = {}) {
+  const lintIgnores = allowed.lintIgnores ?? ALLOWED_LINT_IGNORES;
+  const formatIgnores = allowed.formatIgnores ?? [];
   const problems = [];
   const report = (message) =>
     problems.push({ code: "gate(lint-config)", file: path, message, hint: HINT });
@@ -48,15 +61,15 @@ export function findLooseLintConfig(path, config) {
   const ignores = Array.isArray(record.ignorePatterns) ? record.ignorePatterns : [];
 
   if (path === ROOT_FORMAT_CONFIG) {
-    for (const pattern of ignores) {
+    for (const pattern of ignores.filter((p) => !formatIgnores.includes(p))) {
       report(`ignorePatterns に "${pattern}" がある。フォーマット検査の対象外は作れない。`);
     }
     return problems;
   }
   for (const pattern of ignores) {
-    if (!ALLOWED_LINT_IGNORES.includes(pattern)) {
+    if (!lintIgnores.includes(pattern)) {
       report(
-        `ignorePatterns に "${pattern}" がある。lint の対象外にできるのは ${ALLOWED_LINT_IGNORES.join(", ")} だけ。`,
+        `ignorePatterns に "${pattern}" がある。lint の対象外にできるのは ${lintIgnores.join(", ")} だけ。`,
       );
     }
   }
