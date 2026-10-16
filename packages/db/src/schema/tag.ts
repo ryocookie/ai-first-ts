@@ -1,3 +1,4 @@
+import type { OwnedId } from "@ai-first-ts/ai-profile/db";
 import { sql } from "drizzle-orm";
 import {
   index,
@@ -29,7 +30,7 @@ export const tag = sqliteTable(
 );
 
 // todo とタグの対応。userScoped で読み書きできるよう所有者の userId を持つ。
-// 参照先（todo・tag）が同じユーザーのものであることは API（routers/tag.ts の attach）が確かめる。
+// 参照列は OwnedId なので、data.own で所有者の行だと確かめた id しか書き込めない（実行時も userScoped が確かめる）。
 export const todoTag = sqliteTable(
   "todo_tag",
   {
@@ -37,9 +38,11 @@ export const todoTag = sqliteTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     todoId: text("todo_id")
+      .$type<OwnedId<"todo">>()
       .notNull()
       .references(() => todo.id, { onDelete: "cascade" }),
     tagId: text("tag_id")
+      .$type<OwnedId<"tag">>()
       .notNull()
       .references(() => tag.id, { onDelete: "cascade" }),
   },

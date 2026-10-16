@@ -80,5 +80,24 @@ export const fallbackHint =
   "このエラーコードの直し方は未登録。メッセージが示す型の食い違いを、値の検証・型定義の修正で解消する。" +
   "`any` / `as` / `!` / `@ts-ignore` で黙らせない。直し方が定まったら packages/ai-profile/tsc-hints/hints.mjs に追加を提案する。";
 
-/** @param {number} code */
-export const hintFor = (code) => hints[code] ?? fallbackHint;
+// メッセージで判別できる、コードより具体的な直し方。エラー行と詳細行のどこかに pattern が現れたら
+// hints[code] の代わりに表示する。fixtures の違反例は `// expect: TS<code> <id>` でこちらを検査する。
+/** @type {ReadonlyArray<{ id: string, pattern: RegExp, hint: string }>} */
+export const messageHints = [
+  {
+    id: "owned-id",
+    pattern: /OwnedId<"/,
+    hint:
+      '他のテーブルの行を参照する列（`OwnedId<"テーブル名">`）に、所有者を確かめていない id を渡している' +
+      "（他のユーザーの行に結び付けられる = IDOR）。先に `const ref = await context.data.own(<参照先テーブル>, id)` " +
+      "で所有者の行かを確かめ、`!ref.ok` なら NOT_FOUND を返し、`ref.value` を渡す。where の `eq` も同じ。" +
+      "型述語や `as` で OwnedId を作らない。",
+  },
+];
+
+/**
+ * @param {number} code
+ * @param {string} [message] エラー行と詳細行
+ */
+export const hintFor = (code, message = "") =>
+  messageHints.find(({ pattern }) => pattern.test(message))?.hint ?? hints[code] ?? fallbackHint;

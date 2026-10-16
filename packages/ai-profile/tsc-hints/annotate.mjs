@@ -17,16 +17,20 @@ export const annotate = (output) => {
   const codes = [];
   /** @type {number | undefined} */
   let pending;
+  /** 直し方の選択に使う、pending のエラー行と詳細行。 */
+  let message = "";
 
   const flush = () => {
     if (pending === undefined) return;
-    result.push(`  直し方 (TS${pending}): ${hintFor(pending)}`);
+    result.push(`  直し方 (TS${pending}): ${hintFor(pending, message)}`);
     pending = undefined;
+    message = "";
   };
 
   for (const line of lines) {
     if (pending !== undefined && /^\s+\S/.test(line)) {
       result.push(line);
+      message += `\n${line}`;
       continue;
     }
     flush();
@@ -34,6 +38,7 @@ export const annotate = (output) => {
     const match = errorLine.exec(line);
     if (match) {
       pending = Number(match[1]);
+      message = line;
       codes.push(pending);
     }
   }
