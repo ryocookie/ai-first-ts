@@ -161,6 +161,7 @@ writeFiles(a, {
     compilerOptions: { ...STRICT, target: "ES2022", module: "ESNext", moduleResolution: "bundler" },
     include: ["src"],
   }),
+  "eslint.config.js": 'export default [{ ignores: ["packages/ai-profile/**"] }];\n',
   "package.json": JSON.stringify({
     name: "legacy-api",
     private: true,
@@ -292,7 +293,13 @@ const bGuard = {
   ownManager: guard(b, "bun add zod"),
 };
 
-// --- C: tsconfig がリポジトリ全体（**/*.ts）を含む（Next.js の既定） ----------------------------------
+// --- C: Next.js の既定に近い tsconfig（strict だけ・リポジトリ全体 **/*.ts を含む） ------------------------
+const cOptions = { strict: true, module: "ESNext", moduleResolution: "bundler", noEmit: true };
+const cTsconfig = JSON.stringify({
+  compilerOptions: cOptions,
+  include: ["**/*.ts"],
+  exclude: ["node_modules", "packages/ai-profile"],
+});
 const c = sample("include-all", {
   "package.json": JSON.stringify({
     name: "site",
@@ -301,21 +308,15 @@ const c = sample("include-all", {
     devDependencies: TOOLS,
   }),
   "package-lock.json": '{"name":"site","lockfileVersion":3,"requires":true,"packages":{}}\n',
-  "tsconfig.json": JSON.stringify({
-    compilerOptions: { ...STRICT, module: "ESNext", moduleResolution: "bundler", noEmit: true },
-    include: ["**/*.ts"],
-  }),
+  "tsconfig.json": JSON.stringify({ compilerOptions: cOptions, include: ["**/*.ts"] }),
   "src/index.ts": "export const n = 1;\n",
 });
 const cFirst = run(c, process.execPath, [init, "--owner", "@acme/platform"]);
-writeFiles(c, {
-  "tsconfig.json": JSON.stringify({
-    compilerOptions: { ...STRICT, module: "ESNext", moduleResolution: "bundler", noEmit: true },
-    include: ["**/*.ts"],
-    exclude: ["node_modules", "packages/ai-profile"],
-  }),
-});
+writeFiles(c, { "tsconfig.json": cTsconfig });
 const cSecond = run(c, process.execPath, [init]);
+const cTsconfigAfterSecond = read(c, "tsconfig.json");
+const cProfileTsconfig = read(c, "tsconfig.ai-profile.json");
+const cConfig = configOf(c);
 
 const fromOrigin = run(repo, process.execPath, [init, "--owner", "@acme/platform"]);
 
@@ -329,11 +330,24 @@ describe("init", () => {
     expect(cSecond.status).toBe(0);
   });
 
-  test("既存の tsconfig・package.json は書き換えず、反映する内容を示して止まる", () => {
+  test("既存の tsconfig・package.json・ESLint の設定は書き換えず、反映する内容を示して止まる", () => {
     expect(aFirst.status).toBe(1);
+    // strict でない tsconfig は、型情報付きの lint のために tsconfig.json 自体を厳格にしてもらう。
     expect(aFirst.out).toContain("noUncheckedIndexedAccess");
     expect(aFirst.out).toContain('"oxlint-tsgolint": "^7.0.2004"');
+    expect(aFirst.out).toContain('{ ignores: ["packages/ai-profile/**"] },');
     expect(aTsconfigAfterFirst).toBe(looseTsconfig);
+    expect(existsSync(join(a, "tsconfig.ai-profile.json"))).toBeFalse();
+  });
+
+  test("strict な tsconfig.json に足りない厳格系オプションは、それを extends する検査用の tsconfig で持つ", () => {
+    expect(cTsconfigAfterSecond).toBe(cTsconfig);
+    expect(cProfileTsconfig).toContain('"extends": "./tsconfig.json"');
+    expect(cProfileTsconfig).toContain('"noUncheckedIndexedAccess": true');
+    expect(cConfig).toMatchObject({
+      ok: true,
+      value: { tsconfig: "tsconfig.ai-profile.json", typecheck: ["tsconfig.ai-profile.json"] },
+    });
   });
 
   test("反映後の 2 回目でゲートを通し、導入時の違反をベースラインに記録する", () => {

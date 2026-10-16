@@ -114,6 +114,9 @@ const CHECKS = {
     findWeakenedTsconfig(path, parseJsonc(path, text), context.resolve ?? resolveExtends, {
       base: context.base ?? (context.adopted === true ? adoptedBase : BASE),
       required: context.adopted === true ? REQUIRED_COMPILER_OPTIONS : [],
+      ...(context.overriddenByBase?.get(path) === undefined
+        ? {}
+        : { overriddenByBase: context.overriddenByBase.get(path) }),
     }),
   "gate(lint-config)": (path, text, context) =>
     findLooseLintConfig(
@@ -194,6 +197,11 @@ for (const name of fixtures.sort()) {
     reference: fixtureFile("reference"),
     previous: fixtureFile("previous"),
     configChanged: header("config-changed") === "true",
+    // overridden-by-base: <flag>,<flag>  （任意。base の extends の先として扱い、base が true にするオプション。gate(tsconfig) が使う）
+    overriddenByBase:
+      header("overridden-by-base") === undefined
+        ? undefined
+        : new Map([[path, new Set(String(header("overridden-by-base")).split(","))]]),
   };
   const found = check(path, text, context).filter((p) => p.code === code).length;
   const isValid = name.includes(".valid.");
@@ -209,7 +217,35 @@ for (const name of fixtures.sort()) {
 const read = (f) => readFileSync(join(root, f), "utf8");
 const readIfExists = (f) => (existsSync(join(root, f)) ? read(f) : undefined);
 const adopted = adoption !== undefined;
-const context = { adopted };
+/**
+ * 導入モードで、基準の tsconfig が extends する先（アプリの tsconfig）と、基準の tsconfig が true にするオプション。
+ * 基準の tsconfig をアプリの tsconfig を extends する検査用のファイルにすると、アプリのビルドは今の設定のまま、
+ * 検査だけを厳格にできる。extends の先はアプリの設定なので、基準が上書きするオプションは false でもよい。
+ */
+function overriddenByBase() {
+  const result = new Map();
+  if (!adopted || !tsconfigs.has(adoptedBase)) {
+    return result;
+  }
+  const baseConfig = parseJsonc(adoptedBase, read(adoptedBase));
+  const baseOptions = isPlainObject(baseConfig?.compilerOptions) ? baseConfig.compilerOptions : {};
+  const flags = new Set(Object.keys(baseOptions).filter((k) => baseOptions[k] === true));
+  const queue = [adoptedBase];
+  while (queue.length > 0) {
+    const from = queue.shift() ?? "";
+    const config = parseJsonc(from, read(from));
+    for (const spec of [config?.extends].flat().filter((s) => typeof s === "string")) {
+      const target = resolveExtends(from, spec);
+      if (target !== undefined && target !== adoptedBase && !result.has(target)) {
+        result.set(target, flags);
+        queue.push(target);
+      }
+    }
+  }
+  return result;
+}
+const isPlainObject = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+const context = { adopted, overriddenByBase: overriddenByBase() };
 const problems = [
   ...files
     .filter((f) => f === "package.json" || f.endsWith("/package.json"))

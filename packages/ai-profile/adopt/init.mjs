@@ -331,14 +331,59 @@ if (codeowners === undefined) {
 }
 
 // 基準の tsconfig と厳格系オプション。
-const tsconfigPath =
+// 単一の tsconfig.json が厳格系オプションを持たないときは、アプリの tsconfig は変えずに、それを extends して
+// 厳格系オプションを true にする検査用の tsconfig（tsconfig.ai-profile.json）を置き、基準にする。
+// アプリの tsconfig を厳格にすると、増えた型エラーで next build などアプリ自身の型チェックが落ちる
+// （ベースラインはプロファイルの verify にしか効かない）ため。
+const PROFILE_TSCONFIG = "tsconfig.ai-profile.json";
+const APP_TSCONFIG = "tsconfig.json";
+const chosenTsconfig =
   flags.tsconfig ??
   (isRecord(existingConfig) && typeof existingConfig.tsconfig === "string"
     ? existingConfig.tsconfig
     : existsSync(join(target, "tsconfig.base.json"))
       ? "tsconfig.base.json"
-      : "tsconfig.json");
-const tsconfig = readJsonc(target, tsconfigPath);
+      : APP_TSCONFIG);
+const isStrict = (config) => {
+  const options =
+    isRecord(config) && isRecord(config.compilerOptions) ? config.compilerOptions : {};
+  return REQUIRED_COMPILER_OPTIONS.every((name) => options[name] === true);
+};
+// oxlint の型情報付きの検査（tsgolint）は、各ファイルに一番近い tsconfig.json を使い、別の tsconfig を指定できない。
+// strictNullChecks がないと多くのルールが正しく働かないため、検査用の tsconfig を分けるのは、
+// アプリの tsconfig が既に strict のとき（足りないのが noUncheckedIndexedAccess などの追加分だけのとき）に限る。
+const appTsconfig = readJsonc(target, APP_TSCONFIG);
+const appOptions =
+  isRecord(appTsconfig) && isRecord(appTsconfig.compilerOptions) ? appTsconfig.compilerOptions : {};
+const useProfileTsconfig =
+  chosenTsconfig === PROFILE_TSCONFIG ||
+  (flags.tsconfig === undefined &&
+    !isRecord(existingConfig) &&
+    chosenTsconfig === APP_TSCONFIG &&
+    appOptions.strict === true &&
+    !isStrict(appTsconfig));
+const tsconfigPath = useProfileTsconfig ? PROFILE_TSCONFIG : chosenTsconfig;
+if (useProfileTsconfig) {
+  files.push({
+    path: PROFILE_TSCONFIG,
+    content: formatText(
+      source,
+      PROFILE_TSCONFIG,
+      json({
+        extends: `./${APP_TSCONFIG}`,
+        compilerOptions: Object.fromEntries(REQUIRED_COMPILER_OPTIONS.map((name) => [name, true])),
+      }),
+    ),
+    owned: false,
+  });
+  notes.push(
+    `${APP_TSCONFIG} は変えずに、それを extends して厳格系オプションを true にする ${PROFILE_TSCONFIG} で型チェックする` +
+      "（アプリのビルドは今の設定のまま）。型エラーを直し終えたら、厳格系オプションを tsconfig.json に移して基準にできる。",
+  );
+}
+const tsconfig = useProfileTsconfig
+  ? { compilerOptions: Object.fromEntries(REQUIRED_COMPILER_OPTIONS.map((n) => [n, true])) }
+  : readJsonc(target, tsconfigPath);
 if (!isRecord(tsconfig)) {
   conflicts.push({
     path: tsconfigPath,
@@ -384,6 +429,29 @@ if (otherLinters.length > 0) {
     `ESLint / Prettier の設定（${otherLinters.join(", ")}）は残してよい。プロファイルの検査は oxlint / oxfmt で行う。` +
       "両方が同じファイルを整形しないよう、移行が済んだら外す。",
   );
+}
+// ESLint はプロファイル本体（開発元の規約で書かれ、oxlint で検査済み）も検査し、導入先の規約で落ちる。
+// 設定は JavaScript のことが多く書き換えられないため、無視する指定を示して止まる。
+const IGNORE_PROFILE = {
+  flat: `{ ignores: ["${PROFILE_DIR}/**"] },`,
+  eslintrc: `"ignorePatterns": ["${PROFILE_DIR}/"],`,
+};
+const eslintConfigs = otherLinters.filter((f) =>
+  /(?:^|\/)(?:\.eslintrc(?:\.\w+)?|eslint\.config\.\w+)$/.test(f),
+);
+const eslintIgnore = readText(target, ".eslintignore") ?? "";
+for (const path of eslintConfigs.filter((f) => !f.includes("/"))) {
+  if ((readText(target, path) ?? "").includes(PROFILE_DIR) || eslintIgnore.includes(PROFILE_DIR)) {
+    continue;
+  }
+  const flat = /eslint\.config\.\w+$/.test(path);
+  conflicts.push({
+    path,
+    message: `ESLint の検査対象から ${PROFILE_DIR}/ を外す（プロファイル本体は導入先の ESLint の規約では検査しない）。${
+      flat ? "設定の配列に足す" : "設定に足す"
+    }:`,
+    detail: flat ? IGNORE_PROFILE.flat : IGNORE_PROFILE.eslintrc,
+  });
 }
 
 // --- 3. 書き込む -------------------------------------------------------------------
@@ -477,6 +545,8 @@ const typecheck = git(target, ["ls-files", "--cached", "--others", "--exclude-st
     const cfg = readJsonc(target, f);
     return !(isRecord(cfg) && Array.isArray(cfg.files) && cfg.files.length === 0);
   })
+  // 検査用の tsconfig を置いたときは、アプリの tsconfig の代わりにそれで型チェックする。
+  .map((f) => (useProfileTsconfig && f === APP_TSCONFIG ? PROFILE_TSCONFIG : f))
   .sort();
 const testScript = isRecord(rootPackage.scripts) ? rootPackage.scripts.test : undefined;
 const hasTests = typeof testScript === "string" && !/no test specified/.test(testScript);
@@ -510,7 +580,11 @@ if (!isRecord(existingConfig) || flags.update) {
 // 本体を置いた後でないと含むかどうかを判定できないため、--dry-run で本体がまだないときは判定しない。
 if (existsSync(join(target, PROFILE_DIR))) {
   // 型チェックする tsconfig（typecheck）だけを見る。基準の tsconfig は extends されるだけのこともある。
-  for (const project of Array.isArray(config.typecheck) ? config.typecheck : []) {
+  // 検査用の tsconfig は exclude をアプリの tsconfig から継承するので、アプリの tsconfig に足してもらう。
+  const projects = (Array.isArray(config.typecheck) ? config.typecheck : []).map((p) =>
+    p === PROFILE_TSCONFIG && existsSync(join(target, APP_TSCONFIG)) ? APP_TSCONFIG : p,
+  );
+  for (const project of new Set(projects)) {
     const parsed = ts.getParsedCommandLineOfConfigFile(
       join(target, project),
       {},
