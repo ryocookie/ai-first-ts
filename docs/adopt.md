@@ -35,6 +35,7 @@ bun /tmp/ai-first-ts/packages/ai-profile/adopt/init.mjs --owner @your-org/your-t
 1. **1 回目の `init`。** 無いファイルを足し、既存のファイルへの変更は示して止まる（終了コード 1）。主に示されるもの:
    - 基準の tsconfig で true にする厳格系オプション（`strict`・`noUncheckedIndexedAccess` など。増える型エラーは導入時の分がベースラインに入る）
    - `devDependencies` に足す `typescript`・`oxlint`・`oxlint-tsgolint`・`oxfmt`
+   - 型チェックする tsconfig がプロファイル本体（`packages/ai-profile/`）を含むとき（`"include": ["**/*.ts"]` など）、`exclude` に足す行。本体は導入先の依存では型チェックできず、アプリの tsc やビルドが落ちる
    - 既存の CODEOWNERS に追記する、ゲートファイルの所有者の行
    - 既にある `.oxlintrc.json`・`.claude/settings.json`・CI との差分
 2. **反映して install する。** 示された内容を反映し、依存を入れる（lockfile が更新される）。

@@ -12,7 +12,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import ts from "typescript";
 import { loadAllowlist } from "../gate/deps.mjs";
 import { PROTECTED_PATHS } from "../gate/protected.mjs";
@@ -501,6 +501,33 @@ if (!isRecord(existingConfig) || flags.update) {
   (existingConfig === undefined ? created : replaced).push(CONFIG_PATH);
   if (!flags.dryRun) {
     writeFileSync(join(target, CONFIG_PATH), formatText(source, CONFIG_PATH, json(config)));
+  }
+}
+
+// プロファイル本体は bun で動かす TypeScript のソース（テスト・db/testing など）を含み、導入先の依存では型チェックできない。
+// 導入先の tsconfig がそれを含むと、アプリ自身の tsc・next build などが落ちるため、exclude に入れてもらう。
+// （verify の型チェックはプロファイル本体の型エラーを数えないので、ここで止めないと気付けない）
+// 本体を置いた後でないと含むかどうかを判定できないため、--dry-run で本体がまだないときは判定しない。
+if (existsSync(join(target, PROFILE_DIR))) {
+  // 型チェックする tsconfig（typecheck）だけを見る。基準の tsconfig は extends されるだけのこともある。
+  for (const project of Array.isArray(config.typecheck) ? config.typecheck : []) {
+    const parsed = ts.getParsedCommandLineOfConfigFile(
+      join(target, project),
+      {},
+      { ...ts.sys, onUnRecoverableConfigFileDiagnostic: () => {} },
+    );
+    const includesProfile = (parsed?.fileNames ?? []).some((f) =>
+      relative(target, f).split("\\").join("/").startsWith(`${PROFILE_DIR}/`),
+    );
+    if (includesProfile) {
+      const raw = readJsonc(target, project);
+      const exclude = isRecord(raw) && Array.isArray(raw.exclude) ? raw.exclude : ["node_modules"];
+      conflicts.push({
+        path: project,
+        message: `${PROFILE_DIR}/ を型チェックの対象から外す（プロファイル本体は導入先の依存では型チェックできず、アプリの tsc やビルドが落ちる）:`,
+        detail: `"exclude": [${[...exclude, PROFILE_DIR].map((p) => JSON.stringify(p)).join(", ")}],`,
+      });
+    }
   }
 }
 

@@ -43,7 +43,11 @@ export function findTemplateLeftovers(path, text, repository) {
       .flatMap((line) => line.split(/\s+/).slice(1))
       .map((owner) => owner.toLowerCase()),
   );
-  return TEMPLATE_OWNERS.filter((owner) => owners.has(owner.toLowerCase())).map((owner) => ({
+  // テンプレート元の所有者が、このリポジトリの持ち主（owner/name の owner）でもあるなら書き込み権限があり、置き換え忘れではない。
+  const repositoryOwner = `@${repository.split("/")[0] ?? ""}`.toLowerCase();
+  return TEMPLATE_OWNERS.filter(
+    (owner) => owners.has(owner.toLowerCase()) && owner.toLowerCase() !== repositoryOwner,
+  ).map((owner) => ({
     code: "gate(template)",
     file: path,
     message: `所有者 ${owner} はテンプレート元（${TEMPLATE_REPOSITORY}）の所有者のまま。このリポジトリは ${repository}。`,

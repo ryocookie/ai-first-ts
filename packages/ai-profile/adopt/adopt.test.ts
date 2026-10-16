@@ -292,11 +292,43 @@ const bGuard = {
   ownManager: guard(b, "bun add zod"),
 };
 
+// --- C: tsconfig がリポジトリ全体（**/*.ts）を含む（Next.js の既定） ----------------------------------
+const c = sample("include-all", {
+  "package.json": JSON.stringify({
+    name: "site",
+    private: true,
+    type: "module",
+    devDependencies: TOOLS,
+  }),
+  "package-lock.json": '{"name":"site","lockfileVersion":3,"requires":true,"packages":{}}\n',
+  "tsconfig.json": JSON.stringify({
+    compilerOptions: { ...STRICT, module: "ESNext", moduleResolution: "bundler", noEmit: true },
+    include: ["**/*.ts"],
+  }),
+  "src/index.ts": "export const n = 1;\n",
+});
+const cFirst = run(c, process.execPath, [init, "--owner", "@acme/platform"]);
+writeFiles(c, {
+  "tsconfig.json": JSON.stringify({
+    compilerOptions: { ...STRICT, module: "ESNext", moduleResolution: "bundler", noEmit: true },
+    include: ["**/*.ts"],
+    exclude: ["node_modules", "packages/ai-profile"],
+  }),
+});
+const cSecond = run(c, process.execPath, [init]);
+
 const fromOrigin = run(repo, process.execPath, [init, "--owner", "@acme/platform"]);
 
 rmSync(work, { recursive: true, force: true });
 
 describe("init", () => {
+  test("tsconfig がプロファイル本体を含むなら、exclude に足すよう示して止まる", () => {
+    expect(cFirst.status).toBe(1);
+    expect(cFirst.out).toContain('"exclude": ["node_modules", "packages/ai-profile"],');
+    expect(cSecond.out).not.toContain("型チェックの対象から外す");
+    expect(cSecond.status).toBe(0);
+  });
+
   test("既存の tsconfig・package.json は書き換えず、反映する内容を示して止まる", () => {
     expect(aFirst.status).toBe(1);
     expect(aFirst.out).toContain("noUncheckedIndexedAccess");
