@@ -25,10 +25,32 @@ export const PROTECTED_PATHS = [
     codeowners: "/packages/ai-profile/gate/",
     reason: "ゲートの改ざん検査",
   },
+  // 以下はルールの実装そのもの。1 行消すだけで検査を外せる（例: test/required.mjs の層、lint/run.mjs の対象）ため保護する。
+  // core/（Result・検証の関数）と fixtures/（check-fixtures が期待どおりの成否を検査する）は対象外。
   {
-    pattern: /^packages\/ai-profile\/lint\/[^/]+-boundaries\.mjs$/,
-    codeowners: "/packages/ai-profile/lint/*-boundaries.mjs",
-    reason: "lint ルールの例外境界",
+    pattern: /^packages\/ai-profile\/lint\//,
+    codeowners: "/packages/ai-profile/lint/",
+    reason: "lint ルールの実装・直し方・例外境界",
+  },
+  {
+    pattern: /^packages\/ai-profile\/test\//,
+    codeowners: "/packages/ai-profile/test/",
+    reason: "テスト必須の層とテストの実行",
+  },
+  {
+    pattern: /^packages\/ai-profile\/bin\//,
+    codeowners: "/packages/ai-profile/bin/",
+    reason: "型チェックのラッパー（終了コードを維持する）",
+  },
+  {
+    pattern: /^packages\/ai-profile\/tsc-hints\//,
+    codeowners: "/packages/ai-profile/tsc-hints/",
+    reason: "型エラーの直し方",
+  },
+  {
+    pattern: /^packages\/ai-profile\/db\//,
+    codeowners: "/packages/ai-profile/db/",
+    reason: "ユーザースコープのデータアクセス（認可）",
   },
 ];
 

@@ -35,7 +35,7 @@ TypeScript を AI ファーストにするプロファイル（`packages/ai-prof
 - `.github/workflows/verify.yml`: PR と main への push で `bun packages/ai-profile/gate/check.mjs` と `bun run verify` を実行
 - `.github/CODEOWNERS`: ゲートファイルの変更に所有者のレビューを要求する
 - `packages/ai-profile/gate/`: ゲートの改ざん検査（全 package.json の依存が allowlist にある・tsconfig が厳格度を下げない・lint 設定を緩めない・verify から検査を外さない）。ゲートファイルの一覧は `gate/protected.mjs`
-- ゲートファイル（`gate/protected.mjs` の一覧: `.claude/`・`.github/`・`allowlist.json`・`tsconfig.base.json`・lint/format 設定・lint の境界ファイルなど）は、変更せず提案として報告する
+- ゲートファイル（`gate/protected.mjs` の一覧: `.claude/`・`.github/`・`allowlist.json`・`tsconfig.base.json`・lint/format 設定・ルールの実装（`ai-profile` の lint/・test/・bin/・tsc-hints/・db/）など）は、変更せず提案として報告する
 
 ## 構造ルール（プロファイル開発に伴い順次機械強制される）
 

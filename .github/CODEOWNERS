@@ -8,4 +8,8 @@
 /packages/config/tsconfig.base.json @ryocookie
 /packages/ai-profile/allowlist.json @ryocookie
 /packages/ai-profile/gate/ @ryocookie
-/packages/ai-profile/lint/*-boundaries.mjs @ryocookie
+/packages/ai-profile/lint/ @ryocookie
+/packages/ai-profile/test/ @ryocookie
+/packages/ai-profile/bin/ @ryocookie
+/packages/ai-profile/tsc-hints/ @ryocookie
+/packages/ai-profile/db/ @ryocookie
