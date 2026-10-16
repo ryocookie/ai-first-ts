@@ -4,6 +4,7 @@
 //   gate(lint-config) lint / フォーマット設定は締める方向にしか変えない
 //   gate(scripts)     verify と各パッケージの check-types から検査を外さない
 //   gate(codeowners)  protected.mjs のゲートファイルがすべて CODEOWNERS の対象
+//   gate(template)    テンプレートから作ったリポジトリで、CODEOWNERS の所有者がテンプレート元のまま残っていない
 // 先に fixtures/gate/ の違反例・正しい例で各検査が効いていることを確かめ、検査自体が骨抜きにされていないことを保証する。
 // 使い方: bun packages/ai-profile/gate/check.mjs [--quiet]
 import { spawnSync } from "node:child_process";
@@ -14,6 +15,7 @@ import { CODEOWNERS_PATH, findCodeownersGaps } from "./codeowners.mjs";
 import { findUnlistedDeps, loadAllowlist } from "./deps.mjs";
 import { findLooseLintConfig, isLintOrFormatConfig } from "./lint-config.mjs";
 import { findWeakenedScripts } from "./scripts.mjs";
+import { currentRepository, findTemplateLeftovers } from "./template.mjs";
 import { findWeakenedTsconfig } from "./tsconfig.mjs";
 
 const root = join(import.meta.dirname, "..", "..", "..");
@@ -64,6 +66,7 @@ function resolveExtends(from, spec) {
 }
 
 const allow = loadAllowlist(root);
+const repository = currentRepository(root);
 const CHECKS = {
   "gate(deps)": (path, text) => findUnlistedDeps(path, parseJsonc(path, text), allow),
   "gate(tsconfig)": (path, text) =>
@@ -72,12 +75,14 @@ const CHECKS = {
     findLooseLintConfig(path, path.endsWith(".json") ? parseJsonc(path, text) : undefined),
   "gate(scripts)": (path, text) => findWeakenedScripts(path, parseJsonc(path, text)),
   "gate(codeowners)": (_path, text) => findCodeownersGaps(text),
+  "gate(template)": (path, text, repo = repository) => findTemplateLeftovers(path, text, repo),
 };
 
 // --- 1. 検査自体が効いていることをフィクスチャで確かめる ---------------------------
 // fixtures/gate/<rule>[.<name>].{invalid,valid}.<ext>。先頭のコメント行で検査対象を指定する:
 //   // expect: gate(<rule>)   （# で始めてもよい）
 //   // path: <リポジトリ内のパスとして扱う場所>
+//   // repo: <owner/name>    （任意。今のリポジトリとして扱う名前。gate(template) が使う）
 const fixtureFailures = [];
 const fixtures = readdirSync(fixtureDir).filter((f) => /\.(?:invalid|valid)\.\w+$/.test(f));
 for (const code of Object.keys(CHECKS)) {
@@ -104,7 +109,7 @@ for (const name of fixtures.sort()) {
     );
     continue;
   }
-  const found = check(path, text).filter((p) => p.code === code).length;
+  const found = check(path, text, header("repo")).filter((p) => p.code === code).length;
   const isValid = name.includes(".valid.");
   if (isValid ? found > 0 : found === 0) {
     fixtureFailures.push(
@@ -122,9 +127,11 @@ const problems = [
     .flatMap((f) => [...CHECKS["gate(deps)"](f, read(f)), ...CHECKS["gate(scripts)"](f, read(f))]),
   ...[...tsconfigs].flatMap((f) => CHECKS["gate(tsconfig)"](f, read(f))),
   ...files.filter(isLintOrFormatConfig).flatMap((f) => CHECKS["gate(lint-config)"](f, read(f))),
-  ...CHECKS["gate(codeowners)"](
-    CODEOWNERS_PATH,
-    existsSync(join(root, CODEOWNERS_PATH)) ? read(CODEOWNERS_PATH) : undefined,
+  ...[CHECKS["gate(codeowners)"], CHECKS["gate(template)"]].flatMap((check) =>
+    check(
+      CODEOWNERS_PATH,
+      existsSync(join(root, CODEOWNERS_PATH)) ? read(CODEOWNERS_PATH) : undefined,
+    ),
   ),
 ];
 

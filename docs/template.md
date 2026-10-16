@@ -15,6 +15,8 @@
 | `CLAUDE.md` の見出しと「目的」                                       | プロファイル開発の説明 | 新しいプロダクトの目的                                                         | AI が「`apps/` は検証用サンプル」という前提で作業し続ける                                                       |
 | `README.md` の見出し                                                 | `ai-first-ts`          | プロダクト名                                                                   | 見た目だけ                                                                                                      |
 
+CODEOWNERS の置き換え漏れは、`bun run verify` と CI の `gate(template)` が検出して落とす。リポジトリ名は、CI では `GITHUB_REPOSITORY` から、手元では `origin` の URL から読む。
+
 ルート `package.json` の `"name"` は変えてよい（どこからも参照されていない）。
 
 ### 2. 置き換えない
