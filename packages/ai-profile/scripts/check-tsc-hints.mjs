@@ -1,10 +1,11 @@
 // tsc-hints が verify の型エラーに「直し方」を付けることを検証する:
 // - *.invalid.ts は `// expect: TS<code>` のエラーで失敗し、そのコードに登録済みの直し方が表示される
+//   （`// expect: TS<code> <id>` なら messageHints の <id> の直し方が表示される）
 // - *.valid.ts だけをチェックすると tsc-hints が成功する
 import { spawnSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { hints } from "../tsc-hints/hints.mjs";
+import { hints, messageHints } from "../tsc-hints/hints.mjs";
 
 const packageDir = join(import.meta.dirname, "..");
 const fixtureDir = join(packageDir, "fixtures", "tsc-hints");
@@ -52,7 +53,9 @@ for (const name of readdirSync(fixtureDir)
     continue;
   }
 
-  const header = /^\/\/ expect: TS(\d+)/.exec(readFileSync(join(fixtureDir, name), "utf8"));
+  const header = /^\/\/ expect: TS(\d+)(?: ([\w-]+))?/.exec(
+    readFileSync(join(fixtureDir, name), "utf8"),
+  );
   if (!header) {
     failures.push(
       `${name}: 1行目に "// expect: TS<code>" が無い。\n  直し方: 期待するエラーコードを書く。`,
@@ -66,7 +69,23 @@ for (const name of readdirSync(fixtureDir)
         "  直し方: 違反例がそのエラーを確実に起こすように書き直す（tsconfig を緩めない）。",
     );
   }
-  if (hints[code] === undefined) {
+  const messageHintId = header[2];
+  if (messageHintId !== undefined) {
+    const messageHint = messageHints.find(({ id }) => id === messageHintId);
+    if (messageHint === undefined) {
+      failures.push(
+        `${name}: 直し方 ${messageHintId} が messageHints に無い。\n` +
+          `  直し方: packages/ai-profile/tsc-hints/hints.mjs の messageHints に ${messageHintId} を追加する。`,
+      );
+    } else if (
+      !hintLines.some((line) => line.startsWith(`  直し方 (TS${code}): ${messageHint.hint}`))
+    ) {
+      failures.push(
+        `${name}: TS${code} に ${messageHintId} の直し方が表示されていない。\n` +
+          "  直し方: messageHints の pattern がエラーメッセージ（詳細行を含む）に一致するか確認する。",
+      );
+    }
+  } else if (hints[code] === undefined) {
     failures.push(
       `${name}: TS${code} の直し方が未登録。\n` +
         `  直し方: packages/ai-profile/tsc-hints/hints.mjs に TS${code} の直し方を追加する。`,

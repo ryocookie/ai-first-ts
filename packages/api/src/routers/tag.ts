@@ -1,3 +1,4 @@
+import type { UserScopedDb } from "@ai-first-ts/ai-profile/db";
 import { tag, todoTag } from "@ai-first-ts/db/schema/tag";
 import { todo } from "@ai-first-ts/db/schema/todo";
 import { ORPCError } from "@orpc/server";
@@ -8,6 +9,20 @@ import { DEFAULT_TAG_COLOR, normalizeTagName, validateColor } from "../domain/ta
 import { protectedProcedure } from "../index";
 
 const link = z.object({ todoId: z.string().min(1), tagId: z.string().min(1) });
+
+// リンクの両端が本人の todo・tag であることを確かめ、todo_tag に書ける OwnedId にする。
+// 他のユーザーの todo・tag は存在しない場合と同じく NOT_FOUND（他人の id の存在を漏らさない）。
+async function ownedLink(data: UserScopedDb, input: z.infer<typeof link>) {
+  const todoId = await data.own(todo, input.todoId);
+  const tagId = await data.own(tag, input.tagId);
+  if (!todoId.ok || !tagId.ok) {
+    const failed = todoId.ok ? tagId : todoId;
+    const code =
+      !failed.ok && failed.error.type === "NotOwned" ? "NOT_FOUND" : "INTERNAL_SERVER_ERROR";
+    throw new ORPCError(code);
+  }
+  return { todoId: todoId.value, tagId: tagId.value };
+}
 
 export const tagRouter = {
   list: protectedProcedure.handler(async ({ context }) => {
@@ -63,28 +78,21 @@ export const tagRouter = {
       return { id: input.id };
     }),
 
-  // todo_tag の行は data が userId を付けるが、参照先の todo と tag の所有者までは確かめない。
-  // 他のユーザーの todo・tag の id を渡されても結び付けないよう、両方が見えることを先に確かめる。
   attach: protectedProcedure.input(link).handler(async ({ context, input }) => {
-    const todos = await context.data.select(todo, eq(todo.id, input.todoId));
-    const tags = await context.data.select(tag, eq(tag.id, input.tagId));
+    const { todoId, tagId } = await ownedLink(context.data, input);
     const links = await context.data.select(
       todoTag,
-      and(eq(todoTag.todoId, input.todoId), eq(todoTag.tagId, input.tagId)),
+      and(eq(todoTag.todoId, todoId), eq(todoTag.tagId, tagId)),
     );
-    if (!todos.ok || !tags.ok || !links.ok) {
+    if (!links.ok) {
       throw new ORPCError("INTERNAL_SERVER_ERROR");
-    }
-    // 他のユーザーの todo・tag は data から見えないので、存在しない場合と同じく NOT_FOUND になる。
-    if (todos.value.length === 0 || tags.value.length === 0) {
-      throw new ORPCError("NOT_FOUND");
     }
     // 付け直しは何もしない（冪等）。
     if (links.value.length === 0) {
       const added = await context.data.insert(todoTag, {
         userId: context.data.userId,
-        todoId: input.todoId,
-        tagId: input.tagId,
+        todoId,
+        tagId,
       });
       if (!added.ok) {
         throw new ORPCError("INTERNAL_SERVER_ERROR");
@@ -94,9 +102,10 @@ export const tagRouter = {
   }),
 
   detach: protectedProcedure.input(link).handler(async ({ context, input }) => {
+    const { todoId, tagId } = await ownedLink(context.data, input);
     const removed = await context.data.delete(
       todoTag,
-      and(eq(todoTag.todoId, input.todoId), eq(todoTag.tagId, input.tagId)),
+      and(eq(todoTag.todoId, todoId), eq(todoTag.tagId, tagId)),
     );
     if (!removed.ok) {
       throw new ORPCError("INTERNAL_SERVER_ERROR");

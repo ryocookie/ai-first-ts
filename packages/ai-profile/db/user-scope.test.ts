@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 import { type MemoryDatabase, memoryDatabase } from "./testing";
-import type { UserScopedDb } from "./user-scope";
+import type { OwnedId, UserScopedDb } from "./user-scope";
 
 const note = sqliteTable("note", {
   id: text("id").primaryKey(),
@@ -12,9 +12,20 @@ const note = sqliteTable("note", {
   pinned: integer("pinned", { mode: "boolean" }).notNull().default(false),
 });
 
+// note を参照するテーブル。参照列は OwnedId<"note"> なので data.own で確かめた id しか渡せない。
+const pin = sqliteTable("pin", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  noteId: text("note_id")
+    .$type<OwnedId<"note">>()
+    .notNull()
+    .references(() => note.id),
+});
+
 const DDL = `
   create table note (id text primary key, user_id text not null, body text not null, pinned integer not null default 0);
   insert into note (id, user_id, body) values ('a1', 'alice', 'alice-1'), ('a2', 'alice', 'alice-2'), ('b1', 'bob', 'bob-1');
+  create table pin (id text primary key, user_id text not null, note_id text not null);
 `;
 
 let db: MemoryDatabase;
@@ -92,5 +103,59 @@ describe("delete", () => {
     expect(await bob.delete(note, eq(note.id, "a1"))).toStrictEqual({ ok: true, value: 0 });
     expect(await bob.delete(note)).toStrictEqual({ ok: true, value: 1 });
     expect(allRows().map((row) => row["id"])).toEqual(["a1", "a2"]);
+  });
+});
+
+describe("own", () => {
+  test("所有者の行の id は OwnedId になる", async () => {
+    const owned = await alice.own(note, "a1");
+    expect(owned.ok ? `${owned.value}` : undefined).toBe("a1");
+  });
+
+  test("他人の行・存在しない行は区別せず NotOwned", async () => {
+    const others = await alice.own(note, "b1");
+    const missing = await alice.own(note, "zz");
+    expect(others.ok ? undefined : others.error.type).toBe("NotOwned");
+    expect(missing.ok ? undefined : missing.error).toStrictEqual(
+      others.ok ? undefined : others.error,
+    );
+  });
+});
+
+describe("参照列（外部キー）", () => {
+  const pins = () =>
+    db.rows("select id, user_id as userId, note_id as noteId from pin order by id");
+  // 型をすり抜けた値（型述語での偽装など）。実行時の検査がこれでも他人の行への参照を止めることを確かめる。
+  const forged = (id: string): id is OwnedId<"note"> => id.length > 0;
+  const pinA1 = async () => {
+    const noteId = await alice.own(note, "a1");
+    return noteId.ok
+      ? alice.insert(pin, { id: "p1", userId: alice.userId, noteId: noteId.value })
+      : noteId;
+  };
+
+  test("own で確かめた id なら参照できる", async () => {
+    expect(await pinA1()).toStrictEqual({ ok: true, value: 1 });
+  });
+
+  test("他人の行・存在しない行への参照は NotOwned で、書き込まない", async () => {
+    const ids = ["b1", "zz"].filter(forged);
+    expect(ids).toHaveLength(2);
+    for (const noteId of ids) {
+      const inserted = await alice.insert(pin, { id: `p-${noteId}`, userId: alice.userId, noteId });
+      expect(inserted.ok ? undefined : inserted.error.type).toBe("NotOwned");
+    }
+    expect(pins()).toHaveLength(0);
+  });
+
+  test("update で参照先を他人の行に向けると NotOwned で、書き込まない", async () => {
+    expect(await pinA1()).toStrictEqual({ ok: true, value: 1 });
+    const targets = ["b1"].filter(forged);
+    expect(targets).toHaveLength(1);
+    for (const noteId of targets) {
+      const updated = await alice.update(pin, { noteId }, eq(pin.id, "p1"));
+      expect(updated.ok ? undefined : updated.error.type).toBe("NotOwned");
+    }
+    expect(pins()).toStrictEqual([{ id: "p1", userId: "alice", noteId: "a1" }]);
   });
 });
