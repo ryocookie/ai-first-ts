@@ -12,13 +12,20 @@
  * 3. ゲートファイル（packages/ai-profile/gate/protected.mjs）の編集は、人間の許可を求める（ask）
  *    ベースラインを作り直す（増やしうる）`adopt/verify.mjs --record-baseline` も人間の許可を求める
  *
+ * 1 つのセッションで複数のリポジトリを扱う（プロファイルの開発元から導入先で作業する）ことがあるため、
+ * 1・2 はコマンドを実行するディレクトリ（hook の cwd と `cd <dir>`）のリポジトリの設定で判定し、
+ * 3 は編集するファイルのリポジトリのルートからの相対パスで判定する。
+ * 判定に使うコード（gate/）はセッションのリポジトリ（CLAUDE_PROJECT_DIR）のものを使う。
+ * 導入先の設定（ai-profile.config.json と allowlist.json）が揃っていないリポジトリは、セッションのリポジトリの設定で判定する（緩めない）。
+ *
  * exit 0 = 通す / exit 2 = ブロックし、stderr を Claude にフィードバック / JSON の ask = 人間に確認
  * ローカルの ~/.claude ではなくリポジトリに置くことで、クラウドスレッドにも適用される。
- * Bash の書き込み検出は経験則による。最終的な防御は CODEOWNERS と CI（gate/check.mjs）。
+ * Bash の書き込み先・実行ディレクトリの検出は経験則による。最終的な防御は CODEOWNERS と CI（gate/check.mjs）。
  */
 import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
-import { isAbsolute, join, relative } from "node:path";
+import { homedir } from "node:os";
+import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const block = (reason) => {
@@ -46,7 +53,8 @@ try {
 }
 const tool = String(payload?.tool_name ?? "Bash");
 const input = payload?.tool_input ?? {};
-const projectDir = process.env.CLAUDE_PROJECT_DIR ?? process.cwd();
+const projectDir = resolve(process.env.CLAUDE_PROJECT_DIR ?? process.cwd());
+const startDir = typeof payload?.cwd === "string" ? resolve(payload.cwd) : projectDir;
 
 const gateModule = async (name) => {
   try {
@@ -56,30 +64,59 @@ const gateModule = async (name) => {
   }
 };
 const protectedModule = await gateModule("protected.mjs");
-/** リポジトリルートからの相対パスに直す（リポジトリ外なら undefined）。 */
-const toRepoPath = (p) => {
+
+/** dir を含む git リポジトリのルート（無ければ undefined）。dir 自体はまだ無くてもよい。 */
+const gitRoot = (dir) => {
+  for (let d = dir; ; d = dirname(d)) {
+    if (existsSync(join(d, ".git"))) return d;
+    if (dirname(d) === d) return undefined;
+  }
+};
+/** コマンドの判定に使うリポジトリ: 導入先の設定が揃っていればそのリポジトリ、それ以外はセッションのリポジトリ。 */
+const rulesRoot = (dir) => {
+  const root = gitRoot(dir);
+  if (
+    root !== undefined &&
+    existsSync(join(root, "ai-profile.config.json")) &&
+    existsSync(join(root, "packages/ai-profile/allowlist.json"))
+  ) {
+    return root;
+  }
+  return projectDir;
+};
+
+/** パスを、それを含むリポジトリ（無ければセッションのリポジトリ）と、そのルートからの相対パスに直す。 */
+const locate = (p, dir) => {
   const raw = String(p)
     .replace(/^['"]|['"]$/g, "")
-    .replace(/^\$\{?CLAUDE_PROJECT_DIR\}?\/?/, "");
-  const rel = isAbsolute(raw) ? relative(projectDir, raw) : raw;
-  return rel.startsWith("..") ? undefined : rel.split("\\").join("/").replace(/^\.\//, "");
+    .replace(/^\$\{?CLAUDE_PROJECT_DIR\}?(?=\/|$)/, projectDir)
+    .replace(/^~(?=\/|$)/, homedir());
+  const abs = isAbsolute(raw) ? resolve(raw) : resolve(dir, raw);
+  const root = gitRoot(dirname(abs)) ?? projectDir;
+  const rel = relative(root, abs);
+  if (rel === "" || rel.startsWith("..") || isAbsolute(rel)) return undefined;
+  return { root, path: rel.split("\\").join("/") };
 };
-const protectedReason = (p) => {
-  const path = toRepoPath(p);
-  if (path === undefined) return undefined;
-  if (protectedModule === undefined) return "ゲート定義（gate/protected.mjs）を読めない";
-  return protectedModule.protectedReason(path);
+const protectedReason = (p, dir) => {
+  const located = locate(p, dir);
+  if (located === undefined) return undefined;
+  if (protectedModule === undefined) {
+    return { ...located, reason: "ゲート定義（gate/protected.mjs）を読めない" };
+  }
+  const reason = protectedModule.protectedReason(located.path);
+  return reason === undefined ? undefined : { ...located, reason };
 };
-const protectedMessage = (path, reason) =>
-  `${path} はゲートファイル（${reason}）です。AI が品質ゲートを弱められないよう、編集には人間の許可が要ります。` +
+const protectedMessage = ({ root, path, reason }) =>
+  `${root === projectDir ? path : join(root, path)} はゲートファイル（${reason}）です。` +
+  "AI が品質ゲートを弱められないよう、編集には人間の許可が要ります。" +
   "許可されていない変更なら実行せず、変更案と理由を報告して止まってください。";
 
 // --- 0. Edit / Write 系: ゲートファイルなら人間に確認 ---------------------------
 if (tool !== "Bash") {
   const target = input.file_path ?? input.notebook_path;
   if (target !== undefined) {
-    const reason = protectedReason(target);
-    if (reason !== undefined) ask(protectedMessage(toRepoPath(target), reason));
+    const found = protectedReason(target, startDir);
+    if (found !== undefined) ask(protectedMessage(found));
   }
   process.exit(0);
 }
@@ -116,16 +153,6 @@ const MANAGERS = {
     create: /\byarn\s+create\s+(.*)$/,
   },
 };
-// プロファイルを導入したリポジトリでは、設定の packageManager を使う（読めなければ bun）。
-let packageManager = "bun";
-try {
-  const configured = JSON.parse(
-    readFileSync(join(projectDir, "ai-profile.config.json"), "utf8"),
-  ).packageManager;
-  if (Object.hasOwn(MANAGERS, configured)) packageManager = configured;
-} catch {
-  // 設定がない（プロファイルの開発元・テンプレートから作ったリポジトリ）なら bun。
-}
 const USAGE = {
   bun: "bun add / bun install / bunx",
   npm: "npm install / npm ci / npx",
@@ -137,20 +164,39 @@ if (/\bcreate-next-app\b/.test(command)) {
 }
 
 // --- 2. 依存追加・実行は allowlist のみ ------------------------------------
-let allow;
-try {
-  allow = (await gateModule("deps.mjs")).loadAllowlist(projectDir);
-} catch {
-  block(
-    "packages/ai-profile/allowlist.json を読めません。依存追加は止めて人間に報告してください。",
-  );
-}
+const deps = await gateModule("deps.mjs");
+const rulesCache = new Map();
+/** リポジトリごとのパッケージマネージャと allowlist。 */
+const rulesOf = (root) => {
+  const cached = rulesCache.get(root);
+  if (cached !== undefined) return cached;
+  // プロファイルを導入したリポジトリでは、設定の packageManager を使う（読めなければ bun）。
+  let packageManager = "bun";
+  try {
+    const configured = JSON.parse(
+      readFileSync(join(root, "ai-profile.config.json"), "utf8"),
+    ).packageManager;
+    if (Object.hasOwn(MANAGERS, configured)) packageManager = configured;
+  } catch {
+    // 設定がない（プロファイルの開発元・テンプレートから作ったリポジトリ）なら bun。
+  }
+  let allow;
+  try {
+    allow = deps.loadAllowlist(root);
+  } catch {
+    block(
+      `${join(root, "packages/ai-profile/allowlist.json")} を読めません。依存追加は止めて人間に報告してください。`,
+    );
+  }
+  const rules = { root, packageManager, allow };
+  rulesCache.set(root, rules);
+  return rules;
+};
 const SLOPSQUATTING =
   "存在しない・紛らわしい名前のパッケージを AI が提案する攻撃（slopsquatting）を防ぐため、" +
   "依存追加は人間の承認制です。実装を止め、パッケージ名・用途・npm 上の公開元・代替案を報告してください。";
 // "@scope/name@1.2.3" -> "@scope/name", "name@^1" -> "name"
 const packageName = (t) => (t.startsWith("@") ? "@" + t.slice(1).split("@")[0] : t.split("@")[0]);
-const isAllowed = (p) => p.startsWith("@ai-first-ts/") || allow.has(p);
 
 // コマンドチェーン（&&, ||, ;, |, 改行）を分割して各セグメントを検査
 const segments = command.split(/&&|\|\||;|\||\n/);
@@ -164,39 +210,65 @@ const words = (s) =>
     .filter((t) => t.length > 0);
 const firstArg = (s) => words(s).find((t) => !t.startsWith("-"));
 
+// 各セグメントを実行するディレクトリ。`cd <dir>` / `pushd <dir>` で後続のセグメントのディレクトリが変わる。
+const dirs = [];
+{
+  let dir = startDir;
+  for (const segment of segments) {
+    const cd = segment.match(/^\s*\(?\s*(?:cd|pushd)\s+(\S+)\s*\)?\s*$/);
+    if (cd) {
+      const target = cd[1]
+        .replace(/^['"]|['"]$/g, "")
+        .replace(/^\$\{?CLAUDE_PROJECT_DIR\}?(?=\/|$)/, projectDir)
+        .replace(/^~(?=\/|$)/, homedir());
+      dir = resolve(dir, target);
+    }
+    dirs.push(dir);
+  }
+}
+
 // lint / format / git hooks は oxlint / oxfmt / lefthook に統一する（導入先で既に入っているものを実行するのは止めない）。
 const OTHER_TOOLS = /^(?:eslint|prettier|biome|@biomejs\/biome|ultracite|husky)$/;
 const STACK_TOOLS = "lint / format は oxlint / oxfmt、git hooks は lefthook に統一しています。";
-const isLocalBin = (name) => existsSync(join(projectDir, "node_modules/.bin", name));
 
-let installs = false;
-for (const segment of segments) {
+if (deps === undefined) {
+  block(
+    "packages/ai-profile/gate/deps.mjs を読めません。依存の追加・実行は止めて人間に報告してください。",
+  );
+}
+const installRoots = new Set();
+segments.forEach((segment, i) => {
+  const { root, packageManager, allow } = rulesOf(rulesRoot(dirs[i]));
+  const isAllowed = (p) => p.startsWith("@ai-first-ts/") || allow.has(p);
+  const isLocalBin = (name) => existsSync(join(root, "node_modules/.bin", name));
+  const where = root === projectDir ? "" : `（${root}）`;
   // 決められた以外のパッケージマネージャ。bunx はプロファイルの実行に使うため、どのリポジトリでも下の検査付きで通す。
   for (const [manager, commands] of Object.entries(MANAGERS)) {
     if (manager === packageManager) continue;
     const kinds = manager === "bun" ? ["install", "update", "create"] : Object.keys(commands);
     if (kinds.some((kind) => commands[kind].test(segment))) {
       block(
-        `パッケージマネージャは ${packageManager} のみです` +
+        `パッケージマネージャは ${packageManager} のみです${where}` +
           `${packageManager === "bun" ? "" : "（ai-profile.config.json の packageManager）"}。` +
-          `${USAGE[packageManager]} を使ってください。`,
+          `${USAGE[packageManager]} を使ってください。` +
+          "別のリポジトリで実行するなら、`cd <そのリポジトリ> && <コマンド>` の形で実行してください。",
       );
     }
   }
   const commands = MANAGERS[packageManager];
   const add = segment.match(commands.install);
   if (add) {
-    installs = true;
+    installRoots.add(root);
     const requested = words(add[1] ?? "")
       .filter((t) => !t.startsWith("-") && !t.startsWith("#"))
       .map(packageName);
     if (requested.some((p) => OTHER_TOOLS.test(p))) block(STACK_TOOLS);
     const denied = requested.filter((p) => !isAllowed(p));
     if (denied.length > 0) {
-      block(`allowlist 外のパッケージです: ${denied.join(", ")}。${SLOPSQUATTING}`);
+      block(`allowlist 外のパッケージです${where}: ${denied.join(", ")}。${SLOPSQUATTING}`);
     }
   }
-  if (commands.update.test(segment)) installs = true;
+  if (commands.update.test(segment)) installRoots.add(root);
 
   // bunx <pkg>（npx・pnpm dlx・yarn dlx）はパッケージを取得して実行する。ローカルの bin か allowlist のものだけ。
   const run = segment.match(commands.run) ?? segment.match(MANAGERS.bun.run);
@@ -205,7 +277,7 @@ for (const segment of segments) {
     const name = packageName(runTarget);
     if (!isLocalBin(name) && OTHER_TOOLS.test(name)) block(STACK_TOOLS);
     if (!isLocalBin(name) && !isAllowed(name)) {
-      block(`allowlist 外のパッケージを実行しようとしています: ${name}。${SLOPSQUATTING}`);
+      block(`allowlist 外のパッケージを実行しようとしています${where}: ${name}。${SLOPSQUATTING}`);
     }
   }
   // bun create <x>（npm create など）は create-<x> パッケージを取得して実行する。
@@ -216,35 +288,29 @@ for (const segment of segments) {
       ? createTarget.replace(/^(@[^/]+)\/?(.*)$/, (_m, s, n) => `${s}/create${n ? `-${n}` : ""}`)
       : `create-${packageName(createTarget)}`;
     if (!isAllowed(name)) {
-      block(`allowlist 外のパッケージを実行しようとしています: ${name}。${SLOPSQUATTING}`);
+      block(`allowlist 外のパッケージを実行しようとしています${where}: ${name}。${SLOPSQUATTING}`);
     }
   }
-}
+});
 
-// install 系は、package.json を直接書き換えた依存も入れてしまうため、全 package.json を検査する。
-if (installs) {
-  const deps = await gateModule("deps.mjs");
-  if (deps === undefined) {
-    block(
-      "packages/ai-profile/gate/deps.mjs を読めません。install は止めて人間に報告してください。",
-    );
-  }
+// install 系は、package.json を直接書き換えた依存も入れてしまうため、そのリポジトリの全 package.json を検査する。
+for (const root of installRoots) {
   const listed = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-standard"], {
-    cwd: projectDir,
+    cwd: root,
     encoding: "utf8",
   });
-  const files = listed.stdout
+  const files = (listed.stdout ?? "")
     .split("\n")
     .filter(
       (f) =>
         (f === "package.json" || f.endsWith("/package.json")) &&
         !f.startsWith("packages/ai-profile/fixtures/") &&
-        existsSync(join(projectDir, f)),
+        existsSync(join(root, f)),
     );
-  const problems = deps.checkDeps(projectDir, files);
+  const problems = deps.checkDeps(root, files);
   if (problems.length > 0) {
     block(
-      "package.json に allowlist 外の依存があるため install を止めました:\n" +
+      `package.json に allowlist 外の依存があるため install を止めました${root === projectDir ? "" : `（${root}）`}:\n` +
         problems.map((p) => `  ${p.file} (${p.where}): ${p.message}`).join("\n") +
         `\n${SLOPSQUATTING}`,
     );
@@ -261,16 +327,16 @@ if (/\badopt\/verify\.mjs\b[^;&|]*--record-baseline\b/.test(command)) {
 }
 const WRITERS =
   /^\s*(?:sudo\s+)?(?:sed\b.*\s-i|perl\b.*\s-[a-z]*i|tee\b|mv\b|cp\b|rm\b|rmdir\b|truncate\b|chmod\b|chown\b|ln\b|install\b|touch\b|dd\b|rsync\b|git\s+(?:checkout|restore|rm|mv|apply|am|cherry-pick|revert|stash|reset|clean)\b|(?:node|bun|python3?|perl|ruby|deno)\s+-[ec]\b)/;
-for (const segment of segments) {
+segments.forEach((segment, i) => {
   const targets = [...segment.matchAll(/(?:^|[^<>&\d])\d*>>?\s*([^\s;&|<>]+)/g)].map((m) => m[1]);
   if (WRITERS.test(segment)) {
     targets.push(...words(segment).filter((t) => !t.startsWith("-")));
   }
   for (const t of targets) {
     if (t.startsWith("&")) continue;
-    const reason = protectedReason(t);
-    if (reason !== undefined) ask(protectedMessage(toRepoPath(t), reason));
+    const found = protectedReason(t, dirs[i]);
+    if (found !== undefined) ask(protectedMessage(found));
   }
-}
+});
 
 process.exit(0);

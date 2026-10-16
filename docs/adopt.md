@@ -127,5 +127,6 @@ ESLint・Prettier の設定は残してよい（プロファイルは oxlint・o
 
 - `extends` で npm の tsconfig（`@tsconfig/node20` など）を継承している tsconfig は、`gate(tsconfig)` が「リポジトリ内の tsconfig を指していない」と報告する。基準の tsconfig 以外は、リポジトリ内の tsconfig を extends する。
 - pnpm の CI（`pnpm/action-setup`）は `package.json` の `packageManager` で版を決める。無ければ足す。
+- guard は、コマンドを実行するディレクトリ（hook の cwd と `cd <dir>`）のリポジトリの設定で判定する。開発元のリポジトリのセッションから導入先で作業するときは、`cd <導入先> && npm install` の形で実行する。設定の揃っていないリポジトリは、セッションのリポジトリの設定（bun と allowlist.json）で判定する。
 - ファイルに結び付かない型エラー（tsconfig の誤りなど）はベースラインにできない。直してから導入する。
 - 導入先では lint のフィクスチャ（`lint/check-fixtures.mjs`）を実行しない。代わりに `.oxlintrc.json` がプロファイルの lint 設定と同じことを `gate(adopt-lint)` が検査し、ルールが効いていることは開発元のフィクスチャが保証する。
