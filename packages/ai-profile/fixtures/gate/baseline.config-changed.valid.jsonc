@@ -1,0 +1,11 @@
+// expect: gate(baseline)
+// path: ai-profile.baseline.json
+// previous: baseline.previous.json
+// config-changed: true
+// 層を有効にする PR（設定を変える）では、その層の既存の違反をベースラインに足せる（どちらも所有者がレビューする）。
+{
+  "violations": {
+    "src/server.ts": { "TS2322": 2, "ai-profile(no-throw)": 1, "typescript(no-explicit-any)": 1 },
+    "src/util.ts": { "TS2532": 1 },
+  },
+}

@@ -1,0 +1,9 @@
+// expect: gate(baseline)
+// path: ai-profile.baseline.json
+// previous: baseline.previous.json
+// 直した分だけ減らす（src/util.ts は 0 件になったので消えた）。
+{
+  "violations": {
+    "src/server.ts": { "TS2322": 1, "typescript(no-explicit-any)": 1 },
+  },
+}

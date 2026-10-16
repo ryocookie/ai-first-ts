@@ -2,12 +2,15 @@
 /**
  * guard — PreToolUse(Bash / Edit / Write / MultiEdit / NotebookEdit) hook
  *
- * 1. 既定スタックから外れる操作（Next.js / npm・pnpm・yarn / ESLint・Prettier・Biome）をブロック
- * 2. allowlist（packages/ai-profile/allowlist.json）にない依存の追加・実行をブロック（slopsquatting 対策）
- *    - `bun add <pkg>` の引数、`bunx <pkg>` / `bun create <x>` の実行対象
- *    - `bun install` / `bun add` / `bun update` の前に、全 package.json の依存を検査する
+ * 1. 既定スタックから外れる操作（Next.js / 決められた以外のパッケージマネージャ / ESLint・Prettier・Biome の追加）をブロック
+ *    パッケージマネージャは bun。プロファイルを導入したリポジトリ（ai-profile.config.json）では、その packageManager。
+ * 2. allowlist（packages/ai-profile/allowlist.json と、導入先では設定の dependencies）にない依存の追加・実行をブロック（slopsquatting 対策）
+ *    - `bun add <pkg>`（npm install / pnpm add / yarn add）の引数、
+ *      `bunx <pkg>`（npx / pnpm dlx / yarn dlx）と `bun create <x>`（npm create など）の実行対象
+ *    - install / add / update の前に、全 package.json の依存を検査する
  *      （package.json を Edit で書き換えてから install する迂回を塞ぐ）
  * 3. ゲートファイル（packages/ai-profile/gate/protected.mjs）の編集は、人間の許可を求める（ask）
+ *    ベースラインを作り直す（増やしうる）`adopt/verify.mjs --record-baseline` も人間の許可を求める
  *
  * exit 0 = 通す / exit 2 = ブロックし、stderr を Claude にフィードバック / JSON の ask = 人間に確認
  * ローカルの ~/.claude ではなくリポジトリに置くことで、クラウドスレッドにも適用される。
@@ -85,28 +88,58 @@ const command = String(input.command ?? "");
 if (!command.trim()) process.exit(0);
 
 // --- 1. スタック逸脱 -------------------------------------------------------
-const forbidden = [
-  [/\bcreate-next-app\b/, "Next.js は既定スタック外です。フロントは TanStack Start です。"],
-  [
-    /(^|[;&|]\s*|\s)(npm|pnpm|yarn)\s+(i|install|add|create|exec|dlx)\b/,
-    "パッケージマネージャは bun のみです。bun add / bun install / bunx を使ってください。",
-  ],
-  [
-    /\b(?:bun\s+(?:add|a|install|i)|bunx|bun\s+x)\b[^;&|]*\b(eslint|prettier|biome|ultracite|husky)\b/,
-    "lint / format は oxlint / oxfmt、git hooks は lefthook に統一しています。",
-  ],
-];
-for (const [re, reason] of forbidden) {
-  if (re.test(command)) block(reason);
+// パッケージマネージャごとの、依存を入れる（add / install）・更新する・パッケージを取得して実行する・create するコマンド。
+// 各正規表現の (.*) は引数（パッケージ名やフラグ）。
+const MANAGERS = {
+  bun: {
+    install: /\bbun\s+(?:add|a|install|i)\b(.*)$/,
+    update: /\bbun\s+(?:update|upgrade)\b/,
+    run: /(?:^|\s)(?:bunx|bun\s+x)\s+(.*)$/,
+    create: /\bbun\s+(?:create|c)\s+(.*)$/,
+  },
+  npm: {
+    install: /\bnpm\s+(?:install|i|in|add|ci|clean-install|install-test|it)\b(.*)$/,
+    update: /\bnpm\s+(?:update|up|upgrade)\b/,
+    run: /(?:^|\s)(?:npx|npm\s+(?:exec|x))\s+(.*)$/,
+    create: /\bnpm\s+(?:create|init)\s+([^-\s].*)$/,
+  },
+  pnpm: {
+    install: /\bpnpm\s+(?:add|install|i)\b(.*)$/,
+    update: /\bpnpm\s+(?:update|up|upgrade)\b/,
+    run: /(?:^|\s)(?:pnpx|pnpm\s+(?:dlx|exec))\s+(.*)$/,
+    create: /\bpnpm\s+create\s+(.*)$/,
+  },
+  yarn: {
+    install: /(?:\byarn\s+(?:add|install)\b(.*)$|^\s*yarn\s*$)/,
+    update: /\byarn\s+(?:up|upgrade)\b/,
+    run: /\byarn\s+(?:dlx|exec)\s+(.*)$/,
+    create: /\byarn\s+create\s+(.*)$/,
+  },
+};
+// プロファイルを導入したリポジトリでは、設定の packageManager を使う（読めなければ bun）。
+let packageManager = "bun";
+try {
+  const configured = JSON.parse(
+    readFileSync(join(projectDir, "ai-profile.config.json"), "utf8"),
+  ).packageManager;
+  if (Object.hasOwn(MANAGERS, configured)) packageManager = configured;
+} catch {
+  // 設定がない（プロファイルの開発元・テンプレートから作ったリポジトリ）なら bun。
+}
+const USAGE = {
+  bun: "bun add / bun install / bunx",
+  npm: "npm install / npm ci / npx",
+  pnpm: "pnpm add / pnpm install / pnpm dlx",
+  yarn: "yarn add / yarn install / yarn dlx",
+};
+if (/\bcreate-next-app\b/.test(command)) {
+  block("Next.js は既定スタック外です。フロントは TanStack Start です。");
 }
 
 // --- 2. 依存追加・実行は allowlist のみ ------------------------------------
 let allow;
 try {
-  allow = new Set(
-    JSON.parse(readFileSync(join(projectDir, "packages/ai-profile/allowlist.json"), "utf8"))
-      .packages,
-  );
+  allow = (await gateModule("deps.mjs")).loadAllowlist(projectDir);
 } catch {
   block(
     "packages/ai-profile/allowlist.json を読めません。依存追加は止めて人間に報告してください。",
@@ -131,32 +164,52 @@ const words = (s) =>
     .filter((t) => t.length > 0);
 const firstArg = (s) => words(s).find((t) => !t.startsWith("-"));
 
+// lint / format / git hooks は oxlint / oxfmt / lefthook に統一する（導入先で既に入っているものを実行するのは止めない）。
+const OTHER_TOOLS = /^(?:eslint|prettier|biome|@biomejs\/biome|ultracite|husky)$/;
+const STACK_TOOLS = "lint / format は oxlint / oxfmt、git hooks は lefthook に統一しています。";
+const isLocalBin = (name) => existsSync(join(projectDir, "node_modules/.bin", name));
+
 let installs = false;
 for (const segment of segments) {
-  const add = segment.match(/\bbun\s+(?:add|a|install|i)\b(.*)$/);
+  // 決められた以外のパッケージマネージャ。bunx はプロファイルの実行に使うため、どのリポジトリでも下の検査付きで通す。
+  for (const [manager, commands] of Object.entries(MANAGERS)) {
+    if (manager === packageManager) continue;
+    const kinds = manager === "bun" ? ["install", "update", "create"] : Object.keys(commands);
+    if (kinds.some((kind) => commands[kind].test(segment))) {
+      block(
+        `パッケージマネージャは ${packageManager} のみです` +
+          `${packageManager === "bun" ? "" : "（ai-profile.config.json の packageManager）"}。` +
+          `${USAGE[packageManager]} を使ってください。`,
+      );
+    }
+  }
+  const commands = MANAGERS[packageManager];
+  const add = segment.match(commands.install);
   if (add) {
     installs = true;
-    const denied = words(add[1])
+    const requested = words(add[1] ?? "")
       .filter((t) => !t.startsWith("-") && !t.startsWith("#"))
-      .map(packageName)
-      .filter((p) => !isAllowed(p));
+      .map(packageName);
+    if (requested.some((p) => OTHER_TOOLS.test(p))) block(STACK_TOOLS);
+    const denied = requested.filter((p) => !isAllowed(p));
     if (denied.length > 0) {
       block(`allowlist 外のパッケージです: ${denied.join(", ")}。${SLOPSQUATTING}`);
     }
   }
-  if (/\bbun\s+(?:update|upgrade)\b/.test(segment)) installs = true;
+  if (commands.update.test(segment)) installs = true;
 
-  // bunx <pkg> / bun x <pkg> はパッケージを取得して実行する。ローカルの bin か allowlist のものだけ。
-  const run = segment.match(/(?:^|\s)(?:bunx|bun\s+x)\s+(.*)$/);
+  // bunx <pkg>（npx・pnpm dlx・yarn dlx）はパッケージを取得して実行する。ローカルの bin か allowlist のものだけ。
+  const run = segment.match(commands.run) ?? segment.match(MANAGERS.bun.run);
   const runTarget = run ? firstArg(run[1]) : undefined;
   if (runTarget !== undefined) {
     const name = packageName(runTarget);
-    if (!existsSync(join(projectDir, "node_modules/.bin", name)) && !isAllowed(name)) {
+    if (!isLocalBin(name) && OTHER_TOOLS.test(name)) block(STACK_TOOLS);
+    if (!isLocalBin(name) && !isAllowed(name)) {
       block(`allowlist 外のパッケージを実行しようとしています: ${name}。${SLOPSQUATTING}`);
     }
   }
-  // bun create <x> は create-<x> パッケージを取得して実行する。
-  const create = segment.match(/\bbun\s+(?:create|c)\s+(.*)$/);
+  // bun create <x>（npm create など）は create-<x> パッケージを取得して実行する。
+  const create = segment.match(commands.create);
   const createTarget = create ? firstArg(create[1]) : undefined;
   if (createTarget !== undefined && !/^[./]/.test(createTarget)) {
     const name = createTarget.startsWith("@")
@@ -199,6 +252,13 @@ if (installs) {
 }
 
 // --- 3. ゲートファイルへの書き込みは人間に確認 -----------------------------
+// ベースラインを作り直すと増えうる（--update-baseline は減らすだけなので通す）。
+if (/\badopt\/verify\.mjs\b[^;&|]*--record-baseline\b/.test(command)) {
+  ask(
+    "ai-profile.baseline.json を今の違反で作り直します（増えうる）。層を有効にする時など人間が決めた場合だけ実行します。" +
+      "違反を通すための実行なら止めて、コードを直してください。",
+  );
+}
 const WRITERS =
   /^\s*(?:sudo\s+)?(?:sed\b.*\s-i|perl\b.*\s-[a-z]*i|tee\b|mv\b|cp\b|rm\b|rmdir\b|truncate\b|chmod\b|chown\b|ln\b|install\b|touch\b|dd\b|rsync\b|git\s+(?:checkout|restore|rm|mv|apply|am|cherry-pick|revert|stash|reset|clean)\b|(?:node|bun|python3?|perl|ruby|deno)\s+-[ec]\b)/;
 for (const segment of segments) {

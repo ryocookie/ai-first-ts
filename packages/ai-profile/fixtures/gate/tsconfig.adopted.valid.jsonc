@@ -1,0 +1,20 @@
+// expect: gate(tsconfig)
+// path: tsconfig.json
+// adopted: true
+// base: tsconfig.json
+// 導入先の基準の tsconfig。extends は要らないが、厳格系オプションを全て true にする。
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+  },
+  "include": ["src"],
+}

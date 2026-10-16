@@ -2,6 +2,7 @@
 
 AI が書いたコードを、人間が全行を読まずに本番投入できる品質ゲート（`packages/ai-profile`）を機械強制する TypeScript のスターター。
 GitHub の「Use this template」から新しいリポジトリを作ったら、まず [docs/template.md](docs/template.md) の手順で置き換えとブランチ保護を設定する。
+既に動いているリポジトリに入れるときは、[docs/adopt.md](docs/adopt.md) の `init` で段階的に導入する（既存の違反はベースラインに入れ、増えた分だけを落とす）。
 
 This project was created with [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack), a modern TypeScript stack that combines React, TanStack Start, Hono, ORPC, and more.
 

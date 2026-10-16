@@ -1,0 +1,14 @@
+// expect: gate(adopt-lint)
+// path: .oxlintrc.json
+// reference: adopt-lint.reference.json
+// プロファイルの lint 設定と同じ（キーの順番と $schema は問わない）。
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": ["packages/ai-profile/**"],
+  "rules": {
+    "typescript/no-non-null-assertion": "error",
+    "typescript/no-explicit-any": "error",
+  },
+  "categories": { "correctness": "error" },
+  "plugins": ["typescript", "unicorn", "oxc"],
+}

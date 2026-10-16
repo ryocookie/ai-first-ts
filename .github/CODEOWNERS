@@ -13,3 +13,6 @@
 /packages/ai-profile/bin/ @ryocookie
 /packages/ai-profile/tsc-hints/ @ryocookie
 /packages/ai-profile/db/ @ryocookie
+/packages/ai-profile/adopt/ @ryocookie
+/ai-profile.config.json @ryocookie
+/ai-profile.baseline.json @ryocookie

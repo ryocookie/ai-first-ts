@@ -1,0 +1,27 @@
+// expect: gate(adopt-config)
+// path: ai-profile.config.json
+// digest: sha256-0123abcd
+// 導入時の digest のまま。層は result だけを src/domain/ で有効にし、例外には理由を書く。
+{
+  "profile": {
+    "source": "https://github.com/ryocookie/ai-first-ts",
+    "commit": "7b9a2fa031f6eb79c62c4ca6b666ac2345c342e0",
+    "digest": "sha256-0123abcd",
+  },
+  "packageManager": "npm",
+  "tsconfig": "tsconfig.json",
+  "typecheck": ["tsconfig.json"],
+  "test": "npm test",
+  "baseBranch": "main",
+  "dependencies": ["express"],
+  "rules": {
+    "result": {
+      "files": ["src/domain/**"],
+      "except": [
+        { "files": "src/domain/legacy.ts", "reason": "外部 SDK が throw でしかエラーを返さない" },
+      ],
+    },
+    "validation": { "files": [], "except": [] },
+    "userScope": { "files": [], "except": [] },
+  },
+}

@@ -1,0 +1,12 @@
+// expect: gate(adopt-lint)
+// path: .oxlintrc.json
+// reference: adopt-lint.reference.json
+// ルールを消して緩める（"off" にしないので gate(lint-config) は通ってしまう）。
+{
+  "plugins": ["typescript", "unicorn", "oxc"],
+  "categories": { "correctness": "error" },
+  "rules": {
+    "typescript/no-explicit-any": "error",
+  },
+  "ignorePatterns": ["packages/ai-profile/**"],
+}
