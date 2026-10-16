@@ -1,0 +1,14 @@
+// expect: gate(tsconfig)
+// path: tsconfig.json
+// adopted: true
+// base: tsconfig.ai-profile.json
+// overridden-by-base: strict
+// 導入先のアプリの tsconfig が、基準が上書きしない厳格系オプション（isolatedModules）を false にしている。
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "strict": true,
+    "isolatedModules": false,
+  },
+  "include": ["src"],
+}

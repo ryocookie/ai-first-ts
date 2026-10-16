@@ -33,7 +33,9 @@ bun /tmp/ai-first-ts/packages/ai-profile/adopt/init.mjs --owner @your-org/your-t
 ## 手順
 
 1. **1 回目の `init`。** 無いファイルを足し、既存のファイルへの変更は示して止まる（終了コード 1）。主に示されるもの:
-   - 基準の tsconfig で true にする厳格系オプション（`strict`・`noUncheckedIndexedAccess` など。増える型エラーは導入時の分がベースラインに入る）
+   - 基準の tsconfig で true にする厳格系オプション（`strict`・`noUncheckedIndexedAccess` など。増える型エラーは導入時の分がベースラインに入る）。
+     ただし `tsconfig.json` が既に `strict: true` で、足りないのが追加の厳格系オプションだけなら、`tsconfig.json` は変えずに、それを extends して厳格系オプションを持つ `tsconfig.ai-profile.json` を作って基準にする。アプリのビルド（`next build` など）は今の型チェックのままで、増えた型エラーで落ちない。`strict` まで無いときは、型情報付きの lint（tsgolint は各ファイルに一番近い `tsconfig.json` しか使えない）が正しく働かないため、`tsconfig.json` 自体を厳格にする
+   - ESLint の設定に、プロファイル本体（`packages/ai-profile/**`）を検査しない指定（本体は導入先の ESLint の規約では書かれていない）
    - `devDependencies` に足す `typescript`・`oxlint`・`oxlint-tsgolint`・`oxfmt`
    - 型チェックする tsconfig がプロファイル本体（`packages/ai-profile/`）を含むとき（`"include": ["**/*.ts"]` など）、`exclude` に足す行。本体は導入先の依存では型チェックできず、アプリの tsc やビルドが落ちる
    - 既存の CODEOWNERS に追記する、ゲートファイルの所有者の行
@@ -59,16 +61,16 @@ ESLint・Prettier の設定は残してよい（プロファイルは oxlint・o
 
 ## 設定（ai-profile.config.json）
 
-| 項目             | 意味                                                                                                  |
-| ---------------- | ----------------------------------------------------------------------------------------------------- |
-| `profile`        | 取得元・コミット・プロファイル本体の digest。`--update` が書き換える                                  |
-| `packageManager` | guard が通すパッケージマネージャ。他のものは止める                                                    |
-| `tsconfig`       | 厳格系オプションを true にしておく基準の tsconfig。他の tsconfig はこれを（直接か間接に）extends する |
-| `typecheck`      | `tsc --noEmit -p` で型チェックする tsconfig                                                           |
-| `test`           | テストを実行するコマンド（テストがなければ `null`）。失敗すると verify が落ちる                       |
-| `baseBranch`     | 「変更したファイル」を求める基準のブランチ                                                            |
-| `dependencies`   | 導入時からあった依存。`allowlist.json` と同じ扱いで、これ以外の追加は人間の承認制                     |
-| `rules`          | 層ごとに有効にするルール（下の表）。`files` は有効にする glob、`except` は理由付きの例外（境界）      |
+| 項目             | 意味                                                                                                                                                                                                                                                                                |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `profile`        | 取得元・コミット・プロファイル本体の digest。`--update` が書き換える                                                                                                                                                                                                                |
+| `packageManager` | guard が通すパッケージマネージャ。他のものは止める                                                                                                                                                                                                                                  |
+| `tsconfig`       | 厳格系オプションを true にしておく基準の tsconfig。他の tsconfig はこれを（直接か間接に）extends する。`tsconfig.ai-profile.json` のときは逆に、それが extends する `tsconfig.json` は extends が要らず、基準が上書きするオプションは false でもよい（`strict` だけは true のまま） |
+| `typecheck`      | `tsc --noEmit -p` で型チェックする tsconfig                                                                                                                                                                                                                                         |
+| `test`           | テストを実行するコマンド（テストがなければ `null`）。失敗すると verify が落ちる                                                                                                                                                                                                     |
+| `baseBranch`     | 「変更したファイル」を求める基準のブランチ                                                                                                                                                                                                                                          |
+| `dependencies`   | 導入時からあった依存。`allowlist.json` と同じ扱いで、これ以外の追加は人間の承認制                                                                                                                                                                                                   |
+| `rules`          | 層ごとに有効にするルール（下の表）。`files` は有効にする glob、`except` は理由付きの例外（境界）                                                                                                                                                                                    |
 
 | `rules` のキー | ルール                        | 有効にするときに要るもの                                                                     |
 | -------------- | ----------------------------- | -------------------------------------------------------------------------------------------- |

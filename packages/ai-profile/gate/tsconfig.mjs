@@ -39,9 +39,12 @@ const HINT =
  * @param {string} path リポジトリルートからの相対パス
  * @param {unknown} config tsconfig の内容（コメント除去済み）
  * @param {(from: string, spec: string) => string | undefined} resolveExtends extends をリポジトリ内の tsconfig のパスに解決する
- * @param {{ base?: string, required?: readonly string[] }} [settings]
+ * @param {{ base?: string, required?: readonly string[], overriddenByBase?: ReadonlySet<string> }} [settings]
  *   base: 厳格設定の元になる tsconfig（導入モードでは ai-profile.config.json の tsconfig）。
  *   required: base が true にしていなければならないオプション（導入モード。開発元では packages/config のフィクスチャが保証する）。
+ *   overriddenByBase: path が base の extends の先（導入先のアプリの tsconfig）なら、base が true に上書きするオプション。
+ *     導入モードでは、アプリの tsconfig を変えずに、それを extends する検査用の tsconfig（base）で厳格にできる。
+ *     その場合 path は extends を持たなくてよく、base が上書きするオプションは false でもよい。
  */
 export function findWeakenedTsconfig(path, config, resolveExtends, settings = {}) {
   const base = settings.base ?? BASE;
@@ -54,6 +57,7 @@ export function findWeakenedTsconfig(path, config, resolveExtends, settings = {}
       ? record.compilerOptions
       : {};
 
+  const overridden = settings.overriddenByBase;
   if (path === base) {
     for (const flag of settings.required ?? []) {
       if (options[flag] !== true) {
@@ -61,6 +65,13 @@ export function findWeakenedTsconfig(path, config, resolveExtends, settings = {}
           `compilerOptions.${flag} を true にしていない（基準の tsconfig は厳格系オプションを持つ）。`,
         );
       }
+    }
+  } else if (overridden !== undefined) {
+    // oxlint の型情報付きの検査は一番近い tsconfig.json（こちら）を使うため、strict は外せない。
+    if (options.strict !== true) {
+      report(
+        "compilerOptions.strict を true にしていない（型情報付きの lint がこの tsconfig を使い、strictNullChecks を要る）。",
+      );
     }
   } else {
     const specs = [record.extends].flat().filter((s) => typeof s === "string");
@@ -74,7 +85,7 @@ export function findWeakenedTsconfig(path, config, resolveExtends, settings = {}
     }
   }
   for (const flag of STRICT_FLAGS) {
-    if (options[flag] === false) {
+    if (options[flag] === false && (flag === "strict" || overridden?.has(flag) !== true)) {
       report(`compilerOptions.${flag} を false にしている。`);
     }
   }

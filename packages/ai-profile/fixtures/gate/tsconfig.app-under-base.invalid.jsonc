@@ -1,0 +1,13 @@
+// expect: gate(tsconfig)
+// path: tsconfig.json
+// adopted: true
+// base: tsconfig.ai-profile.json
+// overridden-by-base: strict,noUncheckedIndexedAccess
+// 導入先のアプリの tsconfig が strict を外している（型情報付きの lint がこの tsconfig を使う）。
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "noUncheckedIndexedAccess": false,
+  },
+  "include": ["src"],
+}

@@ -1,0 +1,15 @@
+// expect: gate(tsconfig)
+// path: tsconfig.json
+// adopted: true
+// base: tsconfig.ai-profile.json
+// overridden-by-base: strict,noUncheckedIndexedAccess
+// 導入先のアプリの tsconfig（検査用の tsconfig.ai-profile.json が extends する）。extends がなくてよく、
+// 基準が上書きする追加の厳格系オプションは false でもよい。strict は型情報付きの lint が使うので true のまま。
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "strict": true,
+    "noUncheckedIndexedAccess": false,
+  },
+  "include": ["src"],
+}
