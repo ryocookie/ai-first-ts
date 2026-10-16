@@ -32,14 +32,28 @@ export function sessionOf(userId: string): Session {
 
 export const anonymous: Context = { session: null, data: null };
 
-// packages/db/src/schema/todo.ts と同じ列（マイグレーション未生成のため手で書く）。
+// packages/db/src/schema/todo.ts・tag.ts と同じ列（マイグレーション未生成のため手で書く）。
 const TODO_DDL = `
   create table todo (
     id text primary key,
     user_id text not null,
     title text not null,
     completed integer not null default 0,
+    due_at integer,
     created_at integer not null default (cast(unixepoch('subsecond') * 1000 as integer))
+  );
+  create table tag (
+    id text primary key,
+    user_id text not null,
+    name text not null,
+    color text not null default '#888888',
+    created_at integer not null default (cast(unixepoch('subsecond') * 1000 as integer))
+  );
+  create table todo_tag (
+    user_id text not null,
+    todo_id text not null,
+    tag_id text not null,
+    primary key (todo_id, tag_id)
   );
 `;
 

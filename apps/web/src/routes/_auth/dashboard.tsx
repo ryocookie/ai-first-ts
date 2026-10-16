@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 
+import TodoBoard from "@/components/todo-board";
 import { orpc } from "@/utils/orpc";
 
 export const Route = createFileRoute("/_auth/dashboard")({
@@ -17,6 +18,7 @@ function RouteComponent() {
       <h1>Dashboard</h1>
       <p>Welcome {session.data?.user.name}</p>
       <p>API: {privateData.data?.message}</p>
+      <TodoBoard />
     </div>
   );
 }

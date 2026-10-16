@@ -3,19 +3,30 @@ import { ORPCError } from "@orpc/server";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { tag, todoTag } from "@ai-first-ts/db/schema/tag";
+
+import { attachTags, filterByTag, isOverdue } from "../domain/tag";
 import { summarizeTodos } from "../domain/todo";
 import { protectedProcedure } from "../index";
 
 // データは context.data（ログイン中のユーザーに限定したアクセサ）からだけ読み書きする。
 // where に書くのは絞り込み条件だけで、所有者の条件（userId = ログイン中のユーザー）は data が必ず付ける。
 export const todoRouter = {
-  list: protectedProcedure.handler(async ({ context }) => {
-    const todos = await context.data.select(todo);
-    if (!todos.ok) {
-      throw new ORPCError("INTERNAL_SERVER_ERROR");
-    }
-    return todos.value;
-  }),
+  list: protectedProcedure
+    .input(z.object({ tagId: z.string().optional() }).optional())
+    .handler(async ({ context, input }) => {
+      const todos = await context.data.select(todo);
+      const tags = await context.data.select(tag);
+      const links = await context.data.select(todoTag);
+      if (!todos.ok || !tags.ok || !links.ok) {
+        throw new ORPCError("INTERNAL_SERVER_ERROR");
+      }
+      const withTags = attachTags(todos.value, links.value, tags.value).map((t) => ({
+        ...t,
+        overdue: isOverdue(t, new Date()),
+      }));
+      return input?.tagId ? filterByTag(withTags, input.tagId) : withTags;
+    }),
 
   // 集計はドメイン層の純粋関数に任せ、ここでは I/O（読み込み）とエラーへの変換だけを行う。
   summary: protectedProcedure.handler(async ({ context }) => {
@@ -27,13 +38,19 @@ export const todoRouter = {
   }),
 
   add: protectedProcedure
-    .input(z.object({ title: z.string().trim().min(1).max(200) }))
+    .input(
+      z.object({
+        title: z.string().trim().min(1).max(200),
+        dueAt: z.coerce.date().optional(),
+      }),
+    )
     .handler(async ({ context, input }) => {
       const id = crypto.randomUUID();
       const added = await context.data.insert(todo, {
         id,
         userId: context.data.userId,
         title: input.title,
+        dueAt: input.dueAt ?? null,
       });
       if (!added.ok) {
         throw new ORPCError("INTERNAL_SERVER_ERROR");
