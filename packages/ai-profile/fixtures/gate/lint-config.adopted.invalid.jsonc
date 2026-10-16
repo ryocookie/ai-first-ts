@@ -1,0 +1,10 @@
+// expect: gate(lint-config)
+// path: .oxlintrc.json
+// adopted: true
+// 導入先でも、既存のコードを対象外にして違反を隠すことはできない（既存の違反はベースラインに入れる）。
+{
+  "plugins": ["typescript"],
+  "categories": { "correctness": "error" },
+  "rules": { "typescript/no-explicit-any": "error" },
+  "ignorePatterns": ["packages/ai-profile/**", "src/legacy/**"],
+}

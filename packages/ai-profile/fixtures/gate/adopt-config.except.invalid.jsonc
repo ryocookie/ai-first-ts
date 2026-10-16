@@ -1,0 +1,22 @@
+// expect: gate(adopt-config)
+// path: ai-profile.config.json
+// digest: sha256-0123abcd
+// 理由のない例外で、有効にした層からファイルを外す。
+{
+  "profile": {
+    "source": "https://github.com/ryocookie/ai-first-ts",
+    "commit": "7b9a2fa031f6eb79c62c4ca6b666ac2345c342e0",
+    "digest": "sha256-0123abcd",
+  },
+  "packageManager": "npm",
+  "tsconfig": "tsconfig.json",
+  "typecheck": ["tsconfig.json"],
+  "test": null,
+  "baseBranch": "main",
+  "dependencies": [],
+  "rules": {
+    "result": { "files": ["src/**"], "except": [{ "files": "src/api/**", "reason": " " }] },
+    "validation": { "files": [], "except": [] },
+    "userScope": { "files": [], "except": [] },
+  },
+}

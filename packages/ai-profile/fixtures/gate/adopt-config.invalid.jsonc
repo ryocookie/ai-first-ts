@@ -1,0 +1,22 @@
+// expect: gate(adopt-config)
+// path: ai-profile.config.json
+// digest: sha256-ffff0000
+// プロファイル本体（packages/ai-profile/）を手で書き換えたのに、digest が導入時のまま。
+{
+  "profile": {
+    "source": "https://github.com/ryocookie/ai-first-ts",
+    "commit": "7b9a2fa031f6eb79c62c4ca6b666ac2345c342e0",
+    "digest": "sha256-0123abcd",
+  },
+  "packageManager": "npm",
+  "tsconfig": "tsconfig.json",
+  "typecheck": ["tsconfig.json"],
+  "test": "npm test",
+  "baseBranch": "main",
+  "dependencies": [],
+  "rules": {
+    "result": { "files": [], "except": [] },
+    "validation": { "files": [], "except": [] },
+    "userScope": { "files": [], "except": [] },
+  },
+}

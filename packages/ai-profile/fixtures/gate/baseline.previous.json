@@ -1,0 +1,6 @@
+{
+  "violations": {
+    "src/server.ts": { "TS2322": 2, "typescript(no-explicit-any)": 1 },
+    "src/util.ts": { "TS2532": 1 }
+  }
+}

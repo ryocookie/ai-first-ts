@@ -1,0 +1,8 @@
+// expect: gate(baseline)
+// path: ai-profile.baseline.json
+// 件数が 1 以上の整数でない（0 件や小数で記録を壊す）。
+{
+  "violations": {
+    "src/server.ts": { "TS2322": 0.5 },
+  },
+}

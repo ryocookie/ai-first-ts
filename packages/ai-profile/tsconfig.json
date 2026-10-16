@@ -7,5 +7,5 @@
     "emitDeclarationOnly": true,
     "outDir": "dist"
   },
-  "include": ["core/**/*.ts", "db/**/*.ts", "test/**/*.ts"]
+  "include": ["adopt/**/*.ts", "core/**/*.ts", "db/**/*.ts", "test/**/*.ts"]
 }

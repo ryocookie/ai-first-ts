@@ -1,0 +1,13 @@
+// expect: gate(tsconfig)
+// path: tsconfig.json
+// adopted: true
+// base: tsconfig.json
+// 導入先の基準の tsconfig が、厳格系オプションの一部（noUncheckedIndexedAccess など）を持たない。
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "strict": true,
+  },
+  "include": ["src"],
+}

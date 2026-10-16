@@ -1,0 +1,10 @@
+// expect: gate(lint-config)
+// path: .oxlintrc.json
+// adopted: true
+// 導入先では、開発元で検査済みのプロファイル本体だけを対象外にできる。
+{
+  "plugins": ["typescript"],
+  "categories": { "correctness": "error" },
+  "rules": { "typescript/no-explicit-any": "error" },
+  "ignorePatterns": ["packages/ai-profile/**"],
+}

@@ -1,0 +1,11 @@
+// expect: gate(baseline)
+// path: ai-profile.baseline.json
+// previous: baseline.previous.json
+// 層を有効にしない PR で、新しい違反をベースラインに足して通す。
+{
+  "violations": {
+    "src/server.ts": { "TS2322": 3, "typescript(no-explicit-any)": 1 },
+    "src/new.ts": { "typescript(no-explicit-any)": 1 },
+    "src/util.ts": { "TS2532": 1 },
+  },
+}
