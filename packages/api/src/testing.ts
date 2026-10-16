@@ -32,14 +32,31 @@ export function sessionOf(userId: string): Session {
 
 export const anonymous: Context = { session: null, data: null };
 
-// packages/db/src/schema/todo.ts と同じ列（マイグレーション未生成のため手で書く）。
+// packages/db/src/schema/todo.ts・tag.ts と同じ列・制約（マイグレーション未生成のため手で書く）。
+// 本番の D1 と同じく外部キーを有効にする（user テーブルはないので user_id の参照だけ省く）。
 const TODO_DDL = `
+  pragma foreign_keys = on;
   create table todo (
     id text primary key,
     user_id text not null,
     title text not null,
     completed integer not null default 0,
+    due_on text,
     created_at integer not null default (cast(unixepoch('subsecond') * 1000 as integer))
+  );
+  create table tag (
+    id text primary key,
+    user_id text not null,
+    name text not null,
+    color text not null default '#888888',
+    created_at integer not null default (cast(unixepoch('subsecond') * 1000 as integer))
+  );
+  create unique index tag_userId_name_idx on tag (user_id, name);
+  create table todo_tag (
+    user_id text not null,
+    todo_id text not null references todo(id) on delete cascade,
+    tag_id text not null references tag(id) on delete cascade,
+    primary key (todo_id, tag_id)
   );
 `;
 
