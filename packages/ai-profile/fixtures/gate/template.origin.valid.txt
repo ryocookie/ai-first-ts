@@ -1,0 +1,4 @@
+# expect: gate(template)
+# path: .github/CODEOWNERS
+# repo: ryocookie/ai-first-ts
+/.claude/ @ryocookie

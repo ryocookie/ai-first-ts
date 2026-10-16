@@ -1,0 +1,5 @@
+# expect: gate(template)
+# path: .github/CODEOWNERS
+# repo: acme/product
+/.claude/ @ryocookie
+/.github/ @acme/reviewers
