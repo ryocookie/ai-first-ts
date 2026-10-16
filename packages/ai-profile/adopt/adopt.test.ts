@@ -56,13 +56,28 @@ function sample(name: string, files: Readonly<Record<string, string>>): string {
   return root;
 }
 
-/** guard（PreToolUse hook）に Bash コマンドを渡し、allow / block / ask を返す。 */
-function guard(root: string, command: string): string {
+/**
+ * guard（PreToolUse hook）に Bash コマンドを渡し、allow / block / ask を返す。
+ * session はセッションのリポジトリ（CLAUDE_PROJECT_DIR）、cwd は hook の入力の cwd。
+ * tool が Bash 以外なら、command を編集するファイルのパスとして渡す。
+ */
+function guard(
+  root: string,
+  command: string,
+  options: { readonly session?: string; readonly cwd?: string; readonly tool?: string } = {},
+): string {
+  const session = options.session ?? root;
+  const tool = options.tool ?? "Bash";
+  const toolInput = tool === "Bash" ? { command } : { file_path: command };
   const result = run(
-    root,
+    session,
     "sh",
-    ["-c", 'CLAUDE_PROJECT_DIR="$1" "$2" .claude/hooks/guard.mjs', "sh", root, process.execPath],
-    JSON.stringify({ tool_name: "Bash", tool_input: { command } }),
+    ["-c", 'CLAUDE_PROJECT_DIR="$1" "$2" .claude/hooks/guard.mjs', "sh", session, process.execPath],
+    JSON.stringify({
+      tool_name: tool,
+      tool_input: toolInput,
+      ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
+    }),
   );
   if (result.out.includes('"permissionDecision":"ask"')) {
     return "ask";
@@ -256,6 +271,22 @@ const bSecond = run(b, process.execPath, [init]);
 const bConfig = configOf(b);
 const bWorkflow = read(b, ".github/workflows/ai-profile.yml");
 const bOwnWorkflow = read(b, ".github/workflows/ci.yml");
+// 開発元のリポジトリ（bun）のセッションから、導入先（A: npm）で実行する。判定は導入先の設定で行う。
+const plain = sample("no-profile", {
+  "package.json": JSON.stringify({ name: "plain", private: true }),
+});
+const crossGuard = {
+  cdOwnManager: guard(a, `cd ${a} && npm install lodash`, { session: repo }),
+  cwdOwnManager: guard(a, "npm install lodash", { session: repo, cwd: a }),
+  cdUnknownDependency: guard(a, `cd ${a} && npm install left-pad`, { session: repo }),
+  cdOtherManager: guard(a, `cd ${a} && bun add zod`, { session: repo }),
+  backToSession: guard(a, `cd ${a} && ls && cd ${repo} && npm install lodash`, { session: repo }),
+  noProfile: guard(a, `cd ${plain} && npm install`, { session: repo }),
+  editConfig: guard(a, join(a, "ai-profile.config.json"), { session: repo, tool: "Write" }),
+  writeConfig: guard(a, `cd ${a} && echo {} > ai-profile.config.json`, { session: repo }),
+  editSource: guard(a, join(a, "src/server.ts"), { session: repo, tool: "Edit" }),
+};
+
 const bGuard = {
   otherManager: guard(b, "npm install zod"),
   ownManager: guard(b, "bun add zod"),
@@ -382,5 +413,28 @@ describe("guard（導入モード）", () => {
   test("ベースラインを作り直すコマンドは人間に確かめ、減らすだけのコマンドは通す", () => {
     expect(aGuard.recordBaseline).toBe("ask");
     expect(aGuard.updateBaseline).toBe("allow");
+  });
+});
+
+describe("guard（別のリポジトリのセッションから導入先で実行する）", () => {
+  test("cd 先・hook の cwd のリポジトリの設定で判定する", () => {
+    expect(crossGuard.cdOwnManager).toBe("allow");
+    expect(crossGuard.cwdOwnManager).toBe("allow");
+    expect(crossGuard.cdUnknownDependency).toBe("block");
+    expect(crossGuard.cdOtherManager).toBe("block");
+  });
+
+  test("セッションのリポジトリに戻ったら、セッションのリポジトリの設定で判定する", () => {
+    expect(crossGuard.backToSession).toBe("block");
+  });
+
+  test("プロファイルを導入していないリポジトリは、セッションのリポジトリの設定で判定する（緩めない）", () => {
+    expect(crossGuard.noProfile).toBe("block");
+  });
+
+  test("導入先のゲートファイルの編集は人間に確かめ、それ以外は通す", () => {
+    expect(crossGuard.editConfig).toBe("ask");
+    expect(crossGuard.writeConfig).toBe("ask");
+    expect(crossGuard.editSource).toBe("allow");
   });
 });
