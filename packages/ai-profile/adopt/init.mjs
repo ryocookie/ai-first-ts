@@ -15,6 +15,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import ts from "typescript";
 import { loadAllowlist } from "../gate/deps.mjs";
+import { CODEOWNERS_PATH, patternExists } from "../gate/codeowners.mjs";
 import { PROTECTED_PATHS } from "../gate/protected.mjs";
 import {
   ADOPTED_IGNORES,
@@ -182,9 +183,27 @@ profileEntries.push([LINT_REFERENCE, lintConfig]);
 const digest = digestOf(profileEntries);
 
 const sourceSettings = JSON.parse(readFileSync(join(source, ".claude", "settings.json"), "utf8"));
+// デプロイの禁止。開発元の deny（alchemy・wrangler）に、導入先で使われうるデプロイの経路を足す。
+// vercel は引数なしでもデプロイし、promote・rollback・env pull（シークレットの取得）もあるため、CLI ごと禁止する。
+const DEPLOY_DENY = [
+  "Bash(vercel:*)",
+  "Bash(npx vercel:*)",
+  "Bash(bunx vercel:*)",
+  "Bash(pnpm dlx vercel:*)",
+  "Bash(pnpm exec vercel:*)",
+  "Bash(yarn dlx vercel:*)",
+  "Bash(yarn vercel:*)",
+  "Bash(npm run deploy:*)",
+  "Bash(pnpm run deploy:*)",
+  "Bash(yarn deploy:*)",
+  "Bash(yarn run deploy:*)",
+];
 const settings = json({
   $schema: sourceSettings.$schema,
-  permissions: sourceSettings.permissions,
+  permissions: {
+    ...sourceSettings.permissions,
+    deny: [...new Set([...(sourceSettings.permissions?.deny ?? []), ...DEPLOY_DENY])],
+  },
   hooks: {
     SessionStart: [
       {
@@ -265,10 +284,6 @@ ${nodeSetup}      - run: ${INSTALL[packageManager]}
       - run: bun ${PROFILE_DIR}/adopt/verify.mjs
 `;
 
-const ownedPatterns = [`/${PROFILE_DIR}/`, ...PROTECTED_PATHS.map((p) => p.codeowners)];
-const codeownersLines = (owner) =>
-  [...new Set(ownedPatterns)].map((pattern) => `${pattern} ${owner}`);
-
 /** @type {{ path: string, content: string, owned: boolean }[]} owned: プロファイルの持ち物（--update で置き換える） */
 const files = [
   ...profileEntries.map(([path, content]) => ({ path, content, owned: true })),
@@ -282,6 +297,26 @@ const files = [
   { path: ".oxfmtrc.json", content: json({ ignorePatterns: ADOPTED_IGNORES }), owned: false },
   { path: ".github/workflows/ai-profile.yml", content: workflow, owned: false },
 ];
+
+// 導入先にあるか、init が置くゲートファイルの行だけを書く（lefthook.yml・packages/config/tsconfig.base.json・
+// packages/ai-profile/bin/ のような開発元の構成にしかないパスは書かない）。後からそのファイルを足すと gate(codeowners) が行を求める。
+const targetFiles = git(target, ["ls-files", "--cached", "--others", "--exclude-standard", "-z"])
+  .stdout.split("\0")
+  .filter((f) => f.length > 0 && existsSync(join(target, f)));
+const ownedPatterns = [
+  `/${PROFILE_DIR}/`,
+  ...PROTECTED_PATHS.map((p) => p.codeowners).filter((pattern) =>
+    patternExists(pattern, [
+      ...targetFiles,
+      ...files.map((file) => file.path),
+      CODEOWNERS_PATH,
+      CONFIG_PATH,
+      BASELINE_PATH,
+    ]),
+  ),
+];
+const codeownersLines = (owner) =>
+  [...new Set(ownedPatterns)].map((pattern) => `${pattern} ${owner}`);
 
 // 導入先のフォーマット検査で落ちないよう、開発元の oxfmt で整形しておく。
 for (const file of files) {

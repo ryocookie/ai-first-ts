@@ -1,0 +1,19 @@
+# expect: gate(codeowners)
+# path: .github/CODEOWNERS
+# adopted: true
+# 導入先にない開発元のパス（lefthook.yml・packages/config/tsconfig.base.json・packages/ai-profile/bin/）の行は要らない。
+# exists: .claude/settings.json,.github/CODEOWNERS,.oxlintrc.json,.oxfmtrc.json,packages/ai-profile/allowlist.json,packages/ai-profile/gate/check.mjs,packages/ai-profile/lint/run.mjs,packages/ai-profile/test/run.mjs,packages/ai-profile/tsc-hints/hints.mjs,packages/ai-profile/db/index.ts,packages/ai-profile/adopt/init.mjs,ai-profile.config.json,ai-profile.baseline.json
+/packages/ai-profile/ @acme/platform
+/.claude/ @acme/platform
+/.github/ @acme/platform
+/.oxlintrc.json @acme/platform
+/.oxfmtrc.json @acme/platform
+/packages/ai-profile/allowlist.json @acme/platform
+/packages/ai-profile/gate/ @acme/platform
+/packages/ai-profile/lint/ @acme/platform
+/packages/ai-profile/test/ @acme/platform
+/packages/ai-profile/tsc-hints/ @acme/platform
+/packages/ai-profile/db/ @acme/platform
+/packages/ai-profile/adopt/ @acme/platform
+/ai-profile.config.json @acme/platform
+/ai-profile.baseline.json @acme/platform

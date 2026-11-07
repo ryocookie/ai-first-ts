@@ -47,15 +47,17 @@ bun /tmp/ai-first-ts/packages/ai-profile/adopt/init.mjs --owner @your-org/your-t
 
 ## 置かれるもの
 
-| パス                                       | 中身                                                                                                    |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------- |
-| `packages/ai-profile/`                     | プロファイル本体（lint・gate・test の検査と Result・userScoped）。手で変えない。digest で改変を検出する |
-| `ai-profile.config.json`                   | 導入の設定（下の表）。ゲートファイル                                                                    |
-| `ai-profile.baseline.json`                 | 導入時からある違反（ファイル → 診断コード → 件数）。ゲートファイル                                      |
-| `.github/workflows/ai-profile.yml`         | CI。`gate/check.mjs` と `adopt/verify.mjs` を実行する（既存の CI はそのまま）                           |
-| `.github/CODEOWNERS`                       | ゲートファイルの所有者                                                                                  |
-| `.claude/settings.json`・`hooks/guard.mjs` | Claude Code の hook。allowlist 外の依存とゲートファイルの編集を止める。編集ごとに lint を検査する       |
-| `.oxlintrc.json`・`.oxfmtrc.json`          | プロファイルの lint 設定と同じ内容（`gate(adopt-lint)` が一致を検査する）                               |
+| パス                                       | 中身                                                                                                                                                                      |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/ai-profile/`                     | プロファイル本体（lint・gate・test の検査と Result・userScoped）。手で変えない。digest で改変を検出する                                                                   |
+| `ai-profile.config.json`                   | 導入の設定（下の表）。ゲートファイル                                                                                                                                      |
+| `ai-profile.baseline.json`                 | 導入時からある違反（ファイル → 診断コード → 件数）。ゲートファイル                                                                                                        |
+| `.github/workflows/ai-profile.yml`         | CI。`gate/check.mjs` と `adopt/verify.mjs` を実行する（既存の CI はそのまま）                                                                                             |
+| `.github/CODEOWNERS`                       | ゲートファイルの所有者。導入先にある（init が置く）ゲートファイルの行だけ（下の注）                                                                                       |
+| `.claude/settings.json`・`hooks/guard.mjs` | Claude Code の hook。allowlist 外の依存とゲートファイルの編集を止める。編集ごとに lint を検査する。デプロイ（alchemy・wrangler・vercel・`deploy` スクリプト）を deny する |
+| `.oxlintrc.json`・`.oxfmtrc.json`          | プロファイルの lint 設定と同じ内容（`gate(adopt-lint)` が一致を検査する）                                                                                                 |
+
+CODEOWNERS には、開発元の構成にしかないゲートファイル（`lefthook.yml`・`packages/config/tsconfig.base.json`・`packages/ai-profile/bin/` など）の行は書かない。導入後にそのファイルを足すと、`gate(codeowners)` がその PR で行を求めて落ちる（所有者のレビューを通らずに入ることはない）。以前の init で書かれた行は残っていても害はなく、消してもよい。
 
 ESLint・Prettier の設定は残してよい（プロファイルは oxlint・oxfmt で検査する）。移行が済んだら外す。
 

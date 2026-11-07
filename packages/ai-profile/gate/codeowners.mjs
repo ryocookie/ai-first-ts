@@ -1,5 +1,7 @@
 // gate(codeowners): protected.mjs のゲートファイルがすべて CODEOWNERS で所有者のレビュー対象になっていることを検査する。
 // ゲートファイルを増やしたのに CODEOWNERS を更新し忘れると、その変更が人間の目を通らずにマージされうる。
+// 導入モードでは、リポジトリにあるゲートファイルの行だけを求める（開発元の構成にしかないパスの行は要らない）。
+// 後からそのファイルを足すと、その PR で行がないことが報告されるので、所有者のレビューを通らずに入ることはない。
 import { PROTECTED_PATHS } from "./protected.mjs";
 
 export const CODEOWNERS_PATH = ".github/CODEOWNERS";
@@ -8,8 +10,22 @@ const HINT =
   "packages/ai-profile/gate/protected.mjs の各 codeowners パターンを、所有者付きの行（例: `/.claude/ @ryocookie`）として .github/CODEOWNERS に書く。" +
   "CODEOWNERS の変更は人間の承認制なので、差分を提案として報告する。";
 
-/** @param {string | undefined} text CODEOWNERS の内容（ないときは undefined） */
-export function findCodeownersGaps(text) {
+/**
+ * CODEOWNERS のパターン（`/dir/` か `/file`）に当たるファイルがあるか。
+ * @param {string} pattern
+ * @param {readonly string[]} files リポジトリルートからの相対パス
+ */
+export function patternExists(pattern, files) {
+  const path = pattern.replace(/^\//, "");
+  return path.endsWith("/") ? files.some((f) => f.startsWith(path)) : files.includes(path);
+}
+
+/**
+ * @param {string | undefined} text CODEOWNERS の内容（ないときは undefined）
+ * @param {{ exists?: (pattern: string) => boolean }} [options] exists: 行を求めるパターンを絞る（導入モード）。省略時はすべて求める
+ */
+export function findCodeownersGaps(text, options = {}) {
+  const required = PROTECTED_PATHS.filter((p) => options.exists?.(p.codeowners) ?? true);
   if (text === undefined) {
     return [
       {
@@ -30,12 +46,14 @@ export function findCodeownersGaps(text) {
       .filter((fields) => fields.length >= 2 && fields.slice(1).every((f) => f.startsWith("@")))
       .map((fields) => fields[0]),
   );
-  const problems = PROTECTED_PATHS.filter((p) => !owned.has(p.codeowners)).map((p) => ({
-    code: "gate(codeowners)",
-    file: CODEOWNERS_PATH,
-    message: `${p.codeowners}（${p.reason}）に所有者の行がない。`,
-    hint: HINT,
-  }));
+  const problems = required
+    .filter((p) => !owned.has(p.codeowners))
+    .map((p) => ({
+      code: "gate(codeowners)",
+      file: CODEOWNERS_PATH,
+      message: `${p.codeowners}（${p.reason}）に所有者の行がない。`,
+      hint: HINT,
+    }));
   // CODEOWNERS は後の行が勝つため、所有者のない行は手前の行の所有を外せる。
   for (const fields of lines.filter((f) => f.length === 1)) {
     problems.push({
