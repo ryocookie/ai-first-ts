@@ -1,0 +1,19 @@
+# expect: gate(codeowners)
+# path: .github/CODEOWNERS
+# adopted: true
+# 導入後に lefthook.yml を足したのに、その行がない。
+# exists: .claude/settings.json,.github/CODEOWNERS,.oxlintrc.json,.oxfmtrc.json,packages/ai-profile/allowlist.json,packages/ai-profile/gate/check.mjs,packages/ai-profile/lint/run.mjs,packages/ai-profile/test/run.mjs,packages/ai-profile/tsc-hints/hints.mjs,packages/ai-profile/db/index.ts,packages/ai-profile/adopt/init.mjs,ai-profile.config.json,ai-profile.baseline.json,lefthook.yml
+/packages/ai-profile/ @acme/platform
+/.claude/ @acme/platform
+/.github/ @acme/platform
+/.oxlintrc.json @acme/platform
+/.oxfmtrc.json @acme/platform
+/packages/ai-profile/allowlist.json @acme/platform
+/packages/ai-profile/gate/ @acme/platform
+/packages/ai-profile/lint/ @acme/platform
+/packages/ai-profile/test/ @acme/platform
+/packages/ai-profile/tsc-hints/ @acme/platform
+/packages/ai-profile/db/ @acme/platform
+/packages/ai-profile/adopt/ @acme/platform
+/ai-profile.config.json @acme/platform
+/ai-profile.baseline.json @acme/platform

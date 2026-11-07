@@ -175,6 +175,8 @@ const aSecond = run(a, process.execPath, [init]);
 const aBaseline = baselineOf(a);
 const aViolations = aBaseline.ok ? aBaseline.value.violations : {};
 const aConfig = configOf(a);
+const aCodeowners = read(a, ".github/CODEOWNERS");
+const aSettings = read(a, ".claude/settings.json");
 git(a, "add", "-A");
 git(a, "commit", "-qm", "adopt ai-profile");
 git(a, "checkout", "-qb", "feature");
@@ -207,6 +209,10 @@ const noThrow = read(a, "packages/ai-profile/lint/no-throw.mjs");
 appendFileSync(join(a, "packages/ai-profile/lint/no-throw.mjs"), "\n// tampered\n");
 const aTampered = gate(a);
 writeFiles(a, { "packages/ai-profile/lint/no-throw.mjs": noThrow });
+// 導入後に、導入時にはなかったゲートファイル（lefthook.yml）を CODEOWNERS の行なしで足す。
+writeFiles(a, { "lefthook.yml": "pre-commit:\n  commands: {}\n" });
+const aNewGateFile = gate(a);
+rmSync(join(a, "lefthook.yml"));
 // 層を有効にする（src/ で throw 禁止）。既存の throw はまだベースラインにないので落ちる。
 const configText = read(a, "ai-profile.config.json");
 writeFiles(a, {
@@ -372,6 +378,33 @@ describe("init", () => {
     });
   });
 
+  test("CODEOWNERS には導入先にあるゲートファイルの行だけを書く", () => {
+    expect(aCodeowners).toContain("/packages/ai-profile/adopt/ @acme/platform");
+    expect(aCodeowners).toContain("/ai-profile.baseline.json @acme/platform");
+    // 開発元の構成にしかないパス。
+    expect(aCodeowners).not.toContain("/lefthook.yml");
+    expect(aCodeowners).not.toContain("/packages/config/tsconfig.base.json");
+    expect(aCodeowners).not.toContain("/packages/ai-profile/bin/");
+    expect(missingLines).not.toContain("/lefthook.yml @acme/maintainers");
+  });
+
+  test("デプロイは開発元の alchemy・wrangler に加えて vercel と deploy スクリプトも禁止する", () => {
+    const settings = parseJson(
+      z.object({ permissions: z.object({ deny: z.array(z.string()) }) }),
+      aSettings,
+    );
+    expect(settings.ok).toBeTrue();
+    const denied = settings.ok ? settings.value.permissions.deny : [];
+    for (const rule of [
+      "Bash(wrangler deploy:*)",
+      "Bash(vercel:*)",
+      "Bash(npx vercel:*)",
+      "Bash(npm run deploy:*)",
+    ]) {
+      expect(denied).toContain(rule);
+    }
+  });
+
   test("既存の CODEOWNERS には追記する行を示して止まり、追記後は導入できる", () => {
     expect(bFirst.status).toBe(1);
     expect(bCodeownersAfterFirst).toBe("* @acme/maintainers\n");
@@ -433,6 +466,12 @@ describe("gate（導入モード）", () => {
   test("層を有効にしない変更で、ベースラインを増やすと落ちる", () => {
     expect(aGrownBaseline.status).toBe(1);
     expect(aGrownBaseline.out).toContain("gate(baseline) src/new.ts");
+  });
+
+  test("導入後に足したゲートファイルに CODEOWNERS の行がないと落ちる", () => {
+    expect(aNewGateFile.status).toBe(1);
+    expect(aNewGateFile.out).toContain("/lefthook.yml");
+    expect(aNewGateFile.out).toContain("gate(codeowners)");
   });
 
   test("プロファイル本体を書き換えると落ちる", () => {

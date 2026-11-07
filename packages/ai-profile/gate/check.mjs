@@ -33,7 +33,7 @@ import {
   findConfigProblems,
   findLintReferenceProblems,
 } from "./adoption.mjs";
-import { CODEOWNERS_PATH, findCodeownersGaps } from "./codeowners.mjs";
+import { CODEOWNERS_PATH, findCodeownersGaps, patternExists } from "./codeowners.mjs";
 import { findUnlistedDeps, loadAllowlist } from "./deps.mjs";
 import { findLooseLintConfig, isLintOrFormatConfig, isOxcConfig } from "./lint-config.mjs";
 import { findWeakenedScripts } from "./scripts.mjs";
@@ -62,15 +62,12 @@ const listed = spawnSync("git", ["ls-files", "--cached", "--others", "--exclude-
   cwd: root,
   encoding: "utf8",
 });
-const files = listed.stdout
-  .split("\0")
-  .filter(
-    (f) =>
-      f.length > 0 &&
-      existsSync(join(root, f)) &&
-      !f.startsWith("packages/ai-profile/fixtures/gate/") &&
-      (adoption === undefined || !f.startsWith(`${PROFILE_DIR}/`)),
-  );
+const existing = listed.stdout.split("\0").filter((f) => f.length > 0 && existsSync(join(root, f)));
+const files = existing.filter(
+  (f) =>
+    !f.startsWith("packages/ai-profile/fixtures/gate/") &&
+    (adoption === undefined || !f.startsWith(`${PROFILE_DIR}/`)),
+);
 
 const tsconfigs = new Set(files.filter((f) => /(?:^|\/)tsconfig[^/]*\.json$/.test(f)));
 const workspaceDirs = new Map(
@@ -127,7 +124,14 @@ const CHECKS = {
         : {},
     ),
   "gate(scripts)": (path, text) => findWeakenedScripts(path, parseJsonc(path, text)),
-  "gate(codeowners)": (_path, text) => findCodeownersGaps(text),
+  // 導入モードでは、リポジトリにあるゲートファイルの行だけを求める（context.exists はフィクスチャで指定するファイル）。
+  "gate(codeowners)": (_path, text, context) =>
+    findCodeownersGaps(
+      text,
+      context.adopted === true
+        ? { exists: (pattern) => patternExists(pattern, context.exists ?? existing) }
+        : {},
+    ),
   "gate(template)": (path, text, context) =>
     findTemplateLeftovers(path, text, context.repo ?? repository),
   "gate(adopt-config)": (path, text, context) =>
@@ -158,6 +162,7 @@ const CHECKS = {
 //   // reference: <file>     （任意。プロファイルの lint 設定として扱う fixtures/gate/ のファイル。gate(adopt-lint) が使う）
 //   // previous: <file>      （任意。基準のブランチのベースラインとして扱う fixtures/gate/ のファイル。gate(baseline) が使う）
 //   // config-changed: true  （任意。基準のブランチから設定を変えた PR として扱う。gate(baseline) が使う）
+//   // exists: <path>,<path>  （任意。リポジトリにあるファイルとして扱うパス。導入モードの gate(codeowners) が使う）
 const fixtureFailures = [];
 const fixtures = readdirSync(fixtureDir).filter((f) => /\.(?:invalid|valid)\.\w+$/.test(f));
 for (const code of Object.keys(CHECKS)) {
@@ -197,6 +202,7 @@ for (const name of fixtures.sort()) {
     reference: fixtureFile("reference"),
     previous: fixtureFile("previous"),
     configChanged: header("config-changed") === "true",
+    exists: header("exists")?.split(","),
     // overridden-by-base: <flag>,<flag>  （任意。base の extends の先として扱い、base が true にするオプション。gate(tsconfig) が使う）
     overriddenByBase:
       header("overridden-by-base") === undefined
